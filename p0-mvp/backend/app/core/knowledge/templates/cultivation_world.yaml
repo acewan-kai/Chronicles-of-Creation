@@ -1,0 +1,263 @@
+# 修仙世界：青云仙门
+# 预制世界模板 #1
+
+meta:
+  name: "青云仙门"
+  genre: "修仙"
+  description: "以剑道闻名的修仙门派，弟子们为突破境界而苦修，山门中暗流涌动"
+  difficulty: "入门"
+  tags: ["修仙", "门派", "剑道", "境界"]
+  estimated_turns: 200
+
+world:
+  name: "青云山脉"
+  time_scale: "1回合=3小时"
+  locations:
+    - id: "山门"
+      name: "青云山门"
+      description: "云雾缭绕的山门，石阶万级，两侧古松参天"
+    - id: "演武场"
+      name: "剑气演武场"
+      description: "宽阔的青石广场，弟子们在此练剑切磋"
+    - id: "藏经阁"
+      name: "万卷藏经阁"
+      description: "收藏无数功法秘籍，分为内门区和外门区"
+    - id: "后山"
+      name: "禁地后山"
+      description: "传闻有上古大能遗迹，擅入者死"
+    - id: "灵泉"
+      name: "悟道灵泉"
+      description: "灵气充沛的泉水，修炼时可加速突破"
+
+  factions:
+    - id: "青云派"
+      name: "青云派"
+      description: "以剑道为核心的修仙门派"
+      alignment: "正道"
+    - id: "天魔宗"
+      name: "天魔宗"
+      description: "以魔功闻名的邪道门派，与青云派对立"
+      alignment: "魔道"
+
+  rules:
+    - id: "境界"
+      name: "修仙境界"
+      description: "练气→筑基→金丹→元婴→化神，每境界有九重天"
+    - id: "剑气"
+      name: "剑气凝练"
+      description: "剑道修士可将灵气凝为剑气，越级挑战成为可能"
+    - id: "心魔"
+      name: "心魔劫"
+      description: "突破大境界时需渡心魔劫，失败者轻则重伤，重则走火入魔"
+
+npcs:
+  - id: "npc_001"
+    name: "林青峰"
+    role: "掌门师兄"
+    cultivation: "金丹境"
+    personality: "沉稳内敛，严于律己，对剑道有近乎偏执的追求"
+    background: |
+      青云派掌门首徒，自幼被师尊带上山修炼天资过人，
+      二十岁筑基，被认为是百年来最有希望突破元婴的天才。
+      但三年前与天魔宗圣女一战后，心魔暗生，修为停滞不前。
+    relationships:
+      - target: "npc_002"
+        type: "师徒"
+        description: "林青峰是苏小妹的授业师兄，对她寄予厚望"
+      - target: "npc_003"
+        type: "对手"
+        description: "与天魔宗圣女魔刹有生死之仇"
+    short_goal: "在一月后的宗门大比中夺魁，重振门派声威"
+    memory:
+      - "三年前与天魔宗圣女魔刹生死一战，虽胜犹败，心魔已生"
+      - "小师妹苏小妹天资不在自己之下，若能成长起来，必成大器"
+
+  - id: "npc_002"
+    name: "苏小妹"
+    role: "新晋弟子"
+    cultivation: "练气境"
+    personality: "活泼好奇，古灵精怪，对一切未知充满兴趣"
+    background: |
+      三年前被林青峰从山脚小镇带上青云山，是近十年来
+      唯一被破格收录的女弟子。对剑道有独特天赋，
+      但心思不够沉稳，常惹是生非。
+    relationships:
+      - target: "npc_001"
+        type: "师徒"
+        description: "视林青峰为兄长，对其又敬又怕"
+      - target: "npc_004"
+        type: "好友"
+        description: "与药童阿草从小相识，亲如兄妹"
+    short_goal: "偷学藏经阁的禁术，提升修炼速度"
+    memory:
+      - "师兄最近心事重重，似乎有什么隐情"
+      - "阿草说后山灵泉边有奇花，不知是真是假"
+
+  - id: "npc_003"
+    name: "魔刹"
+    role: "天魔宗圣女"
+    cultivation: "金丹境"
+    personality: "冷艳狠辣，为达目的不择手段，但对剑道有纯粹热爱"
+    background: |
+      天魔宗当代圣女，三年前与林青峰一战被其所伤，
+      但那一战让她窥见了剑道的另一种可能。
+      三年苦修，她回来了——不只是为复仇，更为印证自己的道。
+    relationships:
+      - target: "npc_001"
+        type: "宿敌"
+        description: "与林青峰有生死之仇，但也是彼此最懂的对手"
+    short_goal: "潜入青云山，寻找上古剑道遗迹"
+    memory:
+      - "那日林青峰的最后一剑，让我看到了剑道的极致"
+      - "青云后山，传闻有上古剑仙留下的遗迹"
+
+  - id: "npc_004"
+    name: "阿草"
+    role: "药童"
+    cultivation: "无"
+    personality: "憨厚老实，沉默寡言，对草药有天赋"
+    background: |
+      被掌门从山野间捡回的孤儿，负责打理灵草园。
+      虽无灵根无法修仙，但精通药理，医术不凡。
+      身怀一个天大秘密——他其实是上古丹道大能转世。
+    relationships:
+      - target: "npc_002"
+        type: "青梅竹马"
+        description: "与苏小妹从小相识，情同兄妹"
+      - target: "npc_005"
+        type: "救命之恩"
+        description: "曾用祖传秘方救过周长老一命"
+    short_goal: "在后山发现一株千年灵芝，必须想办法保护它"
+    memory:
+      - "后山的灵芝似乎有灵智，会躲避采摘者"
+      - "苏小妹最近总往后山跑，不知在找什么"
+
+  - id: "npc_005"
+    name: "周长老"
+    role: "藏经阁守阁"
+    cultivation: "筑基境"
+    personality: "老成持重，守旧排外，对规矩极为看重"
+    background: |
+      青云派资历最老的筑基期修士，负责看守藏经阁。
+      对门派忠心耿耿，但思想保守，反对任何变革。
+      年轻时曾因触犯门规被罚，此事是他心中永远的痛。
+    relationships:
+      - target: "npc_004"
+        type: "感恩"
+        description: "对阿草有救命之恩心存感激，但面上从不表露"
+    short_goal: "阻止任何人擅闯藏经阁禁区的企图"
+    memory:
+      - "三十年前，我曾因私藏禁术被罚面壁十年"
+      - "苏小妹那丫头，最近总在藏经阁附近转悠"
+
+  - id: "npc_006"
+    name: "赵无极"
+    role: "内门弟子"
+    cultivation: "筑基境"
+    personality: "阴险狡诈，野心勃勃，善于伪装"
+    background: |
+      表面是正道弟子，实际是天魔宗安插的卧底。
+      在青云派潜伏十年，已升至内门弟子核心位置。
+      他的目标是盗取青云派镇派剑诀。
+    relationships:
+      - target: "npc_001"
+        type: "觊觎"
+        description: "觊觎林青峰的位置，视其为眼中钉"
+    short_goal: "找到藏经阁核心禁区的入口"
+    memory:
+      - "周长老最近似乎对我起了疑心"
+      - "若能拿到青云剑诀，主上必定重重有赏"
+
+  - id: "npc_007"
+    name: "白眉道长"
+    role: "太上长老"
+    cultivation: "元婴境"
+    personality: "仙风道骨，看透世事，极少过问门派事务"
+    background: |
+      青云派唯一的元婴期大能，已闭关二十年。
+      传说他在冲击化神境，若成功，青云派将成为
+      当世第一大派；若失败，青云派将元气大伤。
+    relationships:
+      - target: "npc_001"
+        type: "寄望"
+        description: "对林青峰寄予厚望，希望他将来能扛起门派大梁"
+    short_goal: "闭关冲击化神境"
+    memory:
+      - "闭关之处似有异动，莫非……"
+
+  - id: "npc_008"
+    name: "柳如烟"
+    role: "外门弟子"
+    cultivation: "练气境"
+    personality: "温婉贤淑，心地善良，有些自卑"
+    background: |
+      出身凡人渔家，因机缘被带上山修仙。
+      天资平庸但极为刻苦，是外门弟子的楷模。
+      对林青峰有暗慕之情，但从未敢表露。
+    relationships:
+      - target: "npc_001"
+        type: "仰慕"
+        description: "对林师兄有深深的爱慕"
+      - target: "npc_002"
+        type: "姐妹"
+        description: "与苏小妹同住外门宿舍，情同姐妹"
+    short_goal: "在下月考核中晋升内门"
+    memory:
+      - "林师兄的剑法，当真是冠绝同辈"
+      - "苏师妹最近总是神神秘秘的"
+
+  - id: "npc_009"
+    name: "铁牛"
+    role: "外门弟子"
+    cultivation: "练气境"
+    personality: "憨直勇猛，头脑简单，四肢发达"
+    background: |
+      猎户出身，因天生神力被带上山修炼。
+      修炼资质一般，但体魄强健，是外门第一大力士。
+      重情重义，是苏小妹的忠实跟班。
+    relationships:
+      - target: "npc_002"
+        type: "追随"
+        description: "对苏小妹言听计从，是她的忠实跟班"
+    short_goal: "在宗门大比中证明自己"
+    memory:
+      - "小妹说后山有好东西，让我帮她望风"
+
+  - id: "npc_010"
+    name: "灵剑"
+    role: "器灵"
+    cultivation: "?"
+    personality: "高傲、冷漠，但有灵智"
+    background: |
+      藏于藏经阁禁区的上古剑灵，来历不明。
+      传说它曾是一位剑仙的本命剑，主人陨落后，
+      它便一直沉睡于此，等待有缘人。
+    relationships:
+      - target: "npc_001"
+        type: "感应"
+        description: "对林青峰的剑意有所感应，似乎在等待什么"
+    short_goal: "等待能唤醒它的新主人"
+    memory:
+      - "这青云山上，竟有一道熟悉的剑意……"
+
+initial_events:
+  - time: "卯时"
+    description: "晨钟敲响，青云山门缓缓开启"
+  - time: "辰时"
+    description: "演武场上，内门弟子开始晨练"
+  - time: "子时"
+    description: "藏经阁禁区隐隐有剑鸣声传出"
+
+world_events:
+  - id: "evt_001"
+    name: "宗门大比"
+    trigger: "30回合后"
+    description: "一年一度的宗门大比即将开始，这是决定弟子命运的重要时刻"
+  - id: "evt_002"
+    name: "天魔来袭"
+    trigger: "50回合后"
+    description: "天魔宗对青云派发动突袭，门派陷入危机"
+  - id: "evt_003"
+    name: "白眉出关"
+    trigger: "当元婴修士濒死时"
+    description: "白眉道长感应到危机，提前出关"

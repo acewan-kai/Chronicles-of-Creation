@@ -1,0 +1,258 @@
+# 都市奇幻世界：深夜事务所
+# 预制世界模板 #3
+
+meta:
+  name: "深夜事务所"
+  genre: "都市奇幻"
+  description: "现代都市中隐藏着无数神秘存在，一间不起眼的事务所承接各种超自然委托"
+  difficulty: "入门"
+  tags: ["都市", "奇幻", "异能", "现代"]
+  estimated_turns: 200
+
+world:
+  name: "云海市"
+  time_scale: "1回合=2小时"
+  locations:
+    - id: "事务所"
+      name: "深夜事务所"
+      description: "隐藏在老旧写字楼中的神秘事务所，招牌只在午夜亮起"
+    - id: "酒吧"
+      name: "午夜酒吧"
+      description: "都市异能者的聚集地，各路神秘存在在此交换情报"
+    - id: "古街"
+      name: "云海古街"
+      description: "保留着明清建筑的老街，隐藏着通往灵界的入口"
+    - id: "医院"
+      name: "第一人民医院"
+      description: "都市中阴气最重的地方，传说每到深夜就有诡异之事"
+    - id: "学校"
+      name: "云海大学"
+      description: "百年名校，校园中流传着无数灵异传说"
+
+  factions:
+    - id: "异能者协会"
+      name: "异能者协会"
+      description: "管理都市异能者的神秘组织，势力庞大"
+      alignment: "中立"
+    - id: "妖族联盟"
+      name: "妖族联盟"
+      description: "隐藏在人类中的妖族势力，与协会对立"
+      alignment: "中立"
+    - id: "深渊"
+      name: "深渊势力"
+      description: "来自异界的邪恶力量，企图入侵现实世界"
+      alignment: "邪恶"
+
+  rules:
+    - id: "异能"
+      name: "超自然能力"
+      description: "都市中存在各种异能者，拥有超自然力量"
+    - id: "灵界"
+      name: "灵界通道"
+      description: "都市中存在通往灵界的入口，危险重重"
+    - id: "契约"
+      name: "灵魂契约"
+      description: "异能者可通过契约交换力量，代价是灵魂的一部分"
+
+npcs:
+  - id: "npc_001"
+    name: "林夜"
+    role: "事务所老板"
+    power: "灵魂感知"
+    personality: "玩世不恭，深藏不露，对世事冷眼旁观"
+    background: |
+      深夜事务所的老板，表面上是处理超自然事务的普通人，
+      实际上是活了不知多少年的神秘存在。
+      曾是异能者协会的核心成员，后因某个原因退出。
+      只在深夜现身，接受各种诡异委托。
+    relationships:
+      - target: "npc_002"
+        type: "雇主"
+        description: "苏晚晴是他的得力助手"
+      - target: "npc_003"
+        type: "宿敌"
+        description: "与夜魔有不共戴天之仇"
+    short_goal: "寻找失踪的合伙人"
+    memory:
+      - "她……到底去了哪里"
+
+  - id: "npc_002"
+    name: "苏晚晴"
+    role: "事务所员工"
+    power: "读心术"
+    personality: "冷静理智，洞察人心，表面冷漠实则热心"
+    background: |
+      云海大学心理学研究生，被林夜高薪聘请为事务所员工。
+      天生拥有读心术，却极力隐藏这个能力。
+      对林夜的真实身份充满好奇。
+    relationships:
+      - target: "npc_001"
+        type: "下属"
+        description: "对老板的神秘感到好奇"
+      - target: "npc_004"
+        type: "朋友"
+        description: "与陈医生是大学同学"
+    short_goal: "完成学业的同时调查事务所的秘密"
+    memory:
+      - "老板他……绝对不是普通人"
+
+  - id: "npc_003"
+    name: "夜魔"
+    role: "深渊使者"
+    power: "暗影操控"
+    personality: "残忍狡诈，野心勃勃，追求混沌"
+    background: |
+      来自深渊的高级恶魔，三十年前被林夜封印，
+      如今借助人类躯壳重返人间。
+      它的目标是撕裂现实与灵界的屏障，让深渊吞噬一切。
+    relationships:
+      - target: "npc_001"
+        type: "宿敌"
+        description: "与林夜有三十年未解的仇恨"
+    short_goal: "找到三件上古神器，解开封印"
+    memory:
+      - "林夜……三十年之约已到"
+
+  - id: "npc_004"
+    name: "陈医生"
+    role: "灵异科医生"
+    power: "治愈术"
+    personality: "温和善良，乐于助人，但内心有着沉重秘密"
+    background: |
+      第一人民医院灵异科的主治医生，
+      能用特殊能力治愈被灵异力量伤害的患者。
+      曾是林夜的旧友，三年前因某事分道扬镳。
+    relationships:
+      - target: "npc_002"
+        type: "学长"
+        description: "是苏晚晴的大学学长"
+      - target: "npc_001"
+        type: "旧友"
+        description: "与林夜曾是并肩作战的伙伴"
+    short_goal: "治愈医院中的神秘患者"
+    memory:
+      - "当年的事……是我对不起他"
+
+  - id: "npc_005"
+    name: "白无常"
+    role: "灵界使者"
+    power: "灵魂引导"
+    personality: "亦正亦邪，玩世不恭，喜欢捉弄人类"
+    background: |
+      灵界派驻人间的使者，负责引导游魂。
+      表面吊儿郎当，实则重情重义。
+      对人类世界充满好奇，经常偷偷溜出来玩耍。
+    relationships:
+      - target: "npc_006"
+        type: "同僚"
+        description: "与黑无常是搭档"
+    short_goal: "在人间找到转世的故人"
+    memory:
+      - "那孩子……她还记得我吗"
+
+  - id: "npc_006"
+    name: "黑无常"
+    role: "灵界使者"
+    power: "灵魂收割"
+    personality: "严肃认真，恪守职责，不苟言笑"
+    background: |
+      灵界的精英使者，与白无常搭档千年。
+      对白无常的散漫作风颇为不满，
+      但在关键时刻总会默默守护。
+    relationships:
+      - target: "npc_005"
+        type: "搭档"
+        description: "与白无常合作千年，关系微妙"
+    short_goal: "维护灵界秩序，防止深渊入侵"
+    memory:
+      - "白无常那家伙……又闯祸了"
+
+  - id: "npc_007"
+    name: "吸血鬼伯爵"
+    role: "古老血族"
+    power: "血族异能"
+    personality: "优雅傲慢，绅士风度，但对鲜血有无法抑制的渴望"
+    background: |
+      欧洲古老血族的王子，两百年前来到东方。
+      厌倦了永生的无聊，对人类世界产生了新的兴趣。
+      与异能者协会保持着微妙的和平。
+    relationships:
+      - target: "npc_001"
+        type: "潜在盟友"
+        description: "对林夜的实力颇为忌惮"
+    short_goal: "找到解除血族诅咒的方法"
+    memory:
+      - "东方的灵气……果然与众不同"
+
+  - id: "npc_008"
+    name: "狐妖小九"
+    role: "妖族少女"
+    power: "幻术"
+    personality: "天真烂漫，古灵精怪，对人间充满好奇"
+    background: |
+      修行五百年的九尾狐妖，因贪玩溜入人间。
+      寄宿在云海大学附近，以学生身份隐藏。
+      对都市生活乐此不疲，尤其是奶茶和网络游戏。
+    relationships:
+      - target: "npc_002"
+        type: "好友"
+        description: "与苏晚晴偶然相识，成为好友"
+    short_goal: "攒够钱买最新款手机"
+    memory:
+      - "人类的食物……太好吃了"
+
+  - id: "npc_009"
+    name: "黑客小子"
+    role: "异能黑客"
+    power: "数据操控"
+    personality: "内向腼腆，但一旦面对电脑就判若两人"
+    background: |
+      天才黑客，能入侵任何数字系统。
+      异能觉醒后发现自己能操控数据流。
+      受林夜雇佣，负责情报收集和技术支持。
+    relationships:
+      - target: "npc_001"
+        type: "雇主"
+        description: "为事务所提供技术支持"
+    short_goal: "追查某神秘组织的网络踪迹"
+    memory:
+      - "那个组织……到底是什么来头"
+
+  - id: "npc_010"
+    name: "守护者"
+    role: "都市守护"
+    power: "规则操控"
+    personality: "沉默寡言，坚守职责，不为人知"
+    background: |
+      都市的无名守护者，存在的意义就是维护城市安全。
+      从不出现在人前，只在关键时刻出手。
+      传说每个城市都有一个这样的守护者。
+    relationships:
+      - target: "npc_001"
+        type: "观察"
+        description: "一直在观察林夜"
+    short_goal: "维护云海市的秩序"
+    memory:
+      - "深渊的气息……越来越浓了"
+
+initial_events:
+  - time: "白天"
+    description: "城市喧嚣，没有人注意到暗处的涌动"
+  - time: "黄昏"
+    description: "夕阳西下，古街上开始出现不寻常的身影"
+  - time: "午夜"
+    description: "深夜事务所的招牌亮起，又一个不眠之夜开始"
+
+world_events:
+  - id: "evt_001"
+    name: "深渊裂缝"
+    trigger: "30回合后"
+    description: "城市某处出现通往深渊的裂缝，怪物开始涌入"
+  - id: "evt_002"
+    name: "协会突袭"
+    trigger: "50回合后"
+    description: "异能者协会对事务所发动突袭，真相浮出水面"
+  - id: "evt_003"
+    name: "最终决战"
+    trigger: "当夜魔获得两件神器时"
+    description: "正邪双方在古街展开决战"

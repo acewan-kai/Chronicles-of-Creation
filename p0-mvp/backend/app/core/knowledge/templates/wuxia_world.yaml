@@ -1,0 +1,260 @@
+# 武侠世界：江湖风云录
+# 预制世界模板 #2
+
+meta:
+  name: "江湖风云录"
+  genre: "武侠"
+  description: "明末乱世，门派林立，一把传说中的绝世神兵引发各方势力争夺"
+  difficulty: "入门"
+  tags: ["武侠", "江湖", "门派", "神兵利器"]
+  estimated_turns: 200
+
+world:
+  name: "江南道"
+  time_scale: "1回合=4小时"
+  locations:
+    - id: "总舵"
+      name: "明月楼总舵"
+      description: "江南第一大帮明月楼的总坛所在，飞檐斗拱，气势恢宏"
+    - id: "少林"
+      name: "嵩山少林寺"
+      description: "天下武学正宗，寺中藏经阁有七十二绝技"
+    - id: "丐帮"
+      name: "临安分舵"
+      description: "天下第一大帮的江南分舵，帮众多达数千"
+    - id: "西湖"
+      name: "西湖孤舟"
+      description: "湖上一叶扁舟，常有神秘人物在此接头"
+    - id: "黑风寨"
+      name: "黑风岭"
+      description: "江湖上臭名昭著的匪寨，寨主武功高强"
+
+  factions:
+    - id: "明月楼"
+      name: "明月楼"
+      description: "江南第一大帮，以明月刀法闻名，帮主武功深不可测"
+      alignment: "正道"
+    - id: "少林"
+      name: "少林寺"
+      description: "天下武学正宗，少林七十二绝技名震江湖"
+      alignment: "正道"
+    - id: "天魔教"
+      name: "天魔教"
+      description: "邪道第一大派，欲一统江湖"
+      alignment: "邪道"
+
+  rules:
+    - id: "内力"
+      name: "内力修为"
+      description: "内功修为决定招式威力，共分九重"
+    - id: "招式"
+      name: "武功招式"
+      description: "外功招式，内力催动下可发挥惊人威力"
+    - id: "兵器"
+      name: "神兵利器"
+      description: "神兵有灵，可大幅提升武者战力"
+
+npcs:
+  - id: "npc_001"
+    name: "楚留香"
+    role: "侠盗"
+    martial: "流云飞袖"
+    personality: "风流倜傥，侠义心肠，轻功绝顶"
+    background: |
+      江湖上赫赫有名的侠盗，从不杀人，只取不义之财。
+      轻功独步天下，传闻从未被人抓住过。
+      与明月楼帮主是青梅竹马，但因理念不合分道扬镳。
+    relationships:
+      - target: "npc_002"
+        type: "旧识"
+        description: "与沈轻烟曾是知己，如今形同陌路"
+    short_goal: "夺取贪官污吏的赈灾银两"
+    memory:
+      - "轻烟她……为何要做帮主？"
+
+  - id: "npc_002"
+    name: "沈轻烟"
+    role: "明月楼帮主"
+    martial: "明月刀法"
+    personality: "冷艳高贵，手段狠辣，心中有大抱负"
+    background: |
+      明月楼百年来的第一位女帮主，以铁腕手段，
+      三年内将明月楼发展成江南第一大帮。
+      内心深处，仍有着少女时期的侠客梦。
+    relationships:
+      - target: "npc_001"
+        type: "旧情"
+        description: "与楚留香曾是恋人，因理念不合分道扬镳"
+      - target: "npc_006"
+        type: "敌对"
+        description: "天魔教是明月楼死敌"
+    short_goal: "统一江南武林，抵御天魔教入侵"
+    memory:
+      - "留香他……还是那么潇洒"
+
+  - id: "npc_003"
+    name: "小李飞刀"
+    role: "探花"
+    martial: "小李飞刀"
+    personality: "重情重义，淡泊名利，文武双全"
+    background: |
+      当朝探花郎，却放弃高官厚禄浪迹江湖。
+      飞刀例无虚发，江湖上无人知其飞刀从何而来。
+      与天机老人是忘年交，深谙江湖险恶。
+    relationships:
+      - target: "npc_004"
+        type: "亦敌亦友"
+        description: "与上官金虹曾有一战，对其惺惺相惜"
+    short_goal: "追查天魔教阴谋，保护无辜"
+    memory:
+      - "江湖上最近血案频发，必有蹊跷"
+
+  - id: "npc_004"
+    name: "上官金虹"
+    role: "金钱帮帮主"
+    martial: "龙凤环"
+    personality: "野心勃勃，一代枭雄，追求武道极致"
+    background: |
+      金钱帮帮主，武林公认的绝顶高手。
+      其兵器子母龙凤环，已臻化境。
+      最大的愿望是击败小李飞刀，成为天下第一。
+    relationships:
+      - target: "npc_003"
+        type: "宿敌"
+        description: "一生之敌是击败小李飞刀"
+      - target: "npc_006"
+        type: "利用"
+        description: "与天魔教暗中勾结"
+    short_goal: "寻找传说中的神兵，提升战力"
+    memory:
+      - "小李飞刀……终有一日我会击败你"
+
+  - id: "npc_005"
+    name: "阿飞"
+    role: "剑客"
+    martial: "快剑"
+    personality: "单纯直接，嗜剑如命，对感情迟钝"
+    background: |
+      天生的剑客，一柄竹剑闯江湖。
+      曾被沈轻烟所救，对她念念不忘。
+      剑术天赋惊人，但不懂人情世故。
+    relationships:
+      - target: "npc_002"
+        type: "单恋"
+        description: "对沈轻烟有救命之恩，却不知如何表达感情"
+    short_goal: "寻找真正的剑道"
+    memory:
+      - "轻烟姐姐……她的刀法好快"
+
+  - id: "npc_006"
+    name: "任我行"
+    role: "天魔教教主"
+    martial: "吸星大法"
+    personality: "阴狠毒辣，野心滔天，目空一切"
+    background: |
+      天魔教教主，修习上古魔功，实力深不可测。
+      三十年前被正道联手封印，如今破封而出，
+      发誓要一统江湖。
+    relationships:
+      - target: "npc_002"
+        type: "敌对"
+        description: "视明月楼为眼中钉"
+      - target: "npc_004"
+        type: "利用"
+        description: "暗中拉拢上官金虹"
+    short_goal: "找到神兵，增强魔功威力"
+    memory:
+      - "三十年……我终于回来了"
+
+  - id: "npc_007"
+    name: "林诗音"
+    role: "武林第一美人"
+    martial: "飞凤鞭"
+    personality: "温柔坚强，外柔内刚，深爱李寻欢却无法在一起"
+    background: |
+      武林第一美人，与李寻欢、上官金虹有一段纠葛。
+      现已隐居西湖，与世无争。
+      飞凤鞭法出神入化，只是从不愿再入江湖。
+    relationships:
+      - target: "npc_003"
+        type: "旧情"
+        description: "深爱李寻欢，却被他让给了龙啸云"
+      - target: "npc_004"
+        type: "旧情"
+        description: "上官金虹曾为她疯狂"
+    short_goal: "守护儿子，不让江湖纷争波及"
+    memory:
+      - "寻欢……为何你还是放不下"
+
+  - id: "npc_008"
+    name: "傅红雪"
+    role: "刀客"
+    martial: "天地交征阴阳大悲赋"
+    personality: "孤独冷傲，内心充满仇恨，却有着侠义之心"
+    background: |
+      魔教公主之子，天生残疾，每日需以药物续命。
+      自幼被灌输复仇思想，却不知真相。
+      一柄黑刀，斩尽世间不平事。
+    relationships:
+      - target: "npc_006"
+        type: "父子"
+        description: "任我行是其生父，却不知真相"
+    short_goal: "杀死杜杀的养父，为母报仇"
+    memory:
+      - "我的刀……为何而挥"
+
+  - id: "npc_009"
+    name: "天机老人"
+    role: "武林神话"
+    martial: "无"
+    personality: "看透世事，游戏人间，实则深藏不露"
+    background: |
+      江湖上的传说人物，兵器谱排名第一。
+      看似疯疯癫癫，实则知晓江湖所有秘密。
+      与李寻欢是忘年交。
+    relationships:
+      - target: "npc_003"
+        type: "忘年交"
+        description: "对李寻欢极为欣赏"
+    short_goal: "维护江湖平衡，阻止天魔教阴谋"
+    memory:
+      - "江湖……终究是大人物的江湖"
+
+  - id: "npc_010"
+    name: "明月"
+    role: "神兵剑灵"
+    martial: "?"
+    personality: "高傲纯洁，渴望自由，厌恶杀戮"
+    background: |
+      传说中的绝世神兵"明月"的剑灵。
+      百年前主人陨落，它便隐匿于西湖之中。
+      谁能得到它，便能称霸江湖。
+    relationships:
+      - target: "npc_002"
+        type: "感应"
+        description: "与明月楼有某种神秘联系"
+    short_goal: "等待真正配得上它的主人"
+    memory:
+      - "这把剑……不该沾染鲜血"
+
+initial_events:
+  - time: "清晨"
+    description: "西湖上薄雾弥漫，一叶扁舟缓缓驶过"
+  - time: "午时"
+    description: "明月楼总舵，帮众们正在操练"
+  - time: "子时"
+    description: "黑风岭上，匪徒们正在密谋"
+
+world_events:
+  - id: "evt_001"
+    name: "神兵现世"
+    trigger: "40回合后"
+    description: "西湖中出现异象，明月神兵即将现世"
+  - id: "evt_002"
+    name: "正邪大战"
+    trigger: "60回合后"
+    description: "正邪两道在西湖之畔展开决战"
+  - id: "evt_003"
+    name: "真相大白"
+    trigger: "当关键NPC濒死时"
+    description: "惊天秘密被揭开，各方势力重新洗牌"
