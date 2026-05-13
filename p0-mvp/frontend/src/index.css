@@ -652,6 +652,35 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.agent-plan {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  color: var(--primary-light);
+}
+
+.agent-plan .plan-icon {
+  font-size: 0.7rem;
+}
+
+.agent-plan .plan-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-plan .plan-progress {
+  font-weight: 600;
+  font-size: 0.7rem;
+  color: var(--primary);
+}
+
 .stat-value {
   font-weight: 600;
   margin-right: 0.25rem;

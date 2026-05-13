@@ -503,6 +503,22 @@ async def _init_world_simulation(world_id: str, template_id: str, world_name: st
         ctx.world_state.move_npc(agent.agent_id, loc_id)
         agent.update_location(loc_id)
 
+    # 为每个Agent创建Planner并生成初始计划
+    for agent in ctx.agents.values():
+        agent.planner = Planner(agent.agent_id, planning_interval=10)
+        # 生成初始计划（Mock模式用角色化plan，LLM模式用LLM生成）
+        situation = ctx.world_state.to_context()
+        plan = await agent.planner.generate_plan(
+            identity=agent.config.identity,
+            personality=agent.config.personality,
+            memories=agent.memory.summarize(),
+            situation=situation,
+            current_turn=0,
+            llm_client=llm_client,
+        )
+        if plan:
+            agent.memory.add_plan(f"制定计划: {plan.title}", 0)
+
     # 加载初始关系边到知识图谱
     _rel_map = {
         "师徒": RelationType.FRIEND, "师姐弟": RelationType.FRIEND, "故交": RelationType.FRIEND,
@@ -626,6 +642,29 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
             # 世界氛围渐进变化 (每10回合微调)
             if turn % 10 == 0:
                 _update_world_mood(ctx, metrics)
+
+            # 计划推进 (每回合)
+            for agent in ctx.agents.values():
+                if agent.planner:
+                    agent.planner.progress(turn)
+
+            # 周期性重规划 (每10回合)
+            if turn % 10 == 0 and turn > 0:
+                for agent in ctx.agents.values():
+                    if agent.planner and agent.planner.should_replan(turn):
+                        situation = ctx.world_state.to_context()
+                        plan = await agent.planner.generate_plan(
+                            identity=agent.config.identity,
+                            personality=agent.config.personality,
+                            memories=agent.memory.summarize(),
+                            situation=situation,
+                            current_turn=turn,
+                            llm_client=ctx.executor.llm_client,
+                        )
+                        if plan:
+                            agent.memory.add_plan(
+                                f"制定新计划: {plan.title}", turn
+                            )
 
             # 周期性反思
             if turn % 20 == 0:

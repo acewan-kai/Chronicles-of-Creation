@@ -28,6 +28,21 @@ export interface Agent {
     by_type: Record<string, number>;
     retention_distribution: { high: number; medium: number; low: number };
   };
+  planner?: {
+    active_plans: number;
+    completed_plans: number;
+    failed_plans: number;
+    current_goal: string | null;
+    current_plan: {
+      plan_id: string;
+      title: string;
+      steps: { id: string; description: string; target: string | null }[];
+      current_step: number;
+      progress_pct: number;
+      status: string;
+      created_turn: number;
+    } | null;
+  };
 }
 
 export interface Location {

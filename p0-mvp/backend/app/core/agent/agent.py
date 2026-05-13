@@ -6,9 +6,12 @@ C01 智能体核心
 import asyncio
 import math
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any, Tuple
+from typing import List, Dict, Optional, Any, Tuple, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
+
+if TYPE_CHECKING:
+    from .planner import Planner
 
 
 class MemoryType(Enum):
@@ -415,27 +418,29 @@ class AgentConfig:
 class Agent:
     """
     智能体
-    
+
     代表世界中的NPC角色
-    包含：配置、记忆流、当前状态
+    包含：配置、记忆流、规划器、当前状态
     """
-    
+
     def __init__(
         self,
         agent_id: str,
         config: AgentConfig,
-        memory_stream: Optional[MemoryStream] = None
+        memory_stream: Optional[MemoryStream] = None,
+        planner: Optional["Planner"] = None,
     ):
         self.agent_id = agent_id
         self.config = config
         self.memory = memory_stream or MemoryStream(agent_id)
-        
+        self.planner = planner  # 规划器（首次计划在初始化后由main设置LLM后生成）
+
         # 当前状态
         self.current_location = "unknown"
         self.last_action = ""
         self.survival_turns = 0
         self.is_alive = True
-        
+
         # 内部状态
         self._state: Dict[str, Any] = {}
     
@@ -444,15 +449,26 @@ class Agent:
         return self.config.name
     
     def think(self, situation: str) -> str:
-        """生成思考——整合记忆和状态（优先高retention记忆）"""
+        """生成思考——整合记忆+计划+状态"""
         self.memory.set_turn(self.survival_turns)
         memories = self.memory.get_context(max_chars=800)
         relationships = self._format_relationships()
-        return self.config.format_system_prompt(
+
+        # 注入计划上下文
+        plan_context = ""
+        if self.planner:
+            plan_context = self.planner.get_action_context()
+
+        # 在system_prompt末尾追加计划上下文
+        base_prompt = self.config.format_system_prompt(
             situation=situation,
             memories=memories,
             relationships=relationships
         )
+        if plan_context:
+            base_prompt += f"\n\n{plan_context}"
+
+        return base_prompt
 
     def observe(self, content: str, turn: int):
         """记录观察"""
@@ -519,4 +535,5 @@ class Agent:
             "is_alive": self.is_alive,
             "memory_count": len(self.memory.memories),
             "memory_stats": self.memory.get_stats(),
+            "planner": self.planner.to_dict() if self.planner else None,
         }

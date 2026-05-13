@@ -22,6 +22,13 @@ export const AgentList: React.FC<AgentListProps> = ({ agents, events }) => {
                   <span className="agent-identity">{agent.config?.identity || ''}</span>
                 </div>
               </div>
+              {agent.planner?.current_plan && (
+                <div className="agent-plan" title={agent.planner.current_plan.steps.map(s => s.description).join(' → ')}>
+                  <span className="plan-icon">🎯</span>
+                  <span className="plan-title">{agent.planner.current_plan.title}</span>
+                  <span className="plan-progress">{Math.round(agent.planner.current_plan.progress_pct * 100)}%</span>
+                </div>
+              )}
               <div className="agent-stats">
                 <span className="stat">
                   <span className="stat-value">{agent.survival_turns}</span>
