@@ -20,6 +20,14 @@ export interface Agent {
   survival_turns: number;
   is_alive: boolean;
   memory_count: number;
+  memory_stats?: {
+    total: number;
+    avg_retention: number;
+    total_forgotten: number;
+    total_added: number;
+    by_type: Record<string, number>;
+    retention_distribution: { high: number; medium: number; low: number };
+  };
 }
 
 export interface Location {

@@ -35,6 +35,12 @@ export const AgentList: React.FC<AgentListProps> = ({ agents, events }) => {
                   <span className="stat-value">{agent.memory_count}</span>
                   <span className="stat-label">记忆</span>
                 </span>
+                {agent.memory_stats && (
+                  <span className="stat retention" title={`留存率: ${(agent.memory_stats.avg_retention * 100).toFixed(0)}%, 遗忘${agent.memory_stats.total_forgotten}条`}>
+                    <span className="stat-value">{(agent.memory_stats.avg_retention * 100).toFixed(0)}%</span>
+                    <span className="stat-label">留存</span>
+                  </span>
+                )}
               </div>
               <div className="agent-bar">
                 <div
