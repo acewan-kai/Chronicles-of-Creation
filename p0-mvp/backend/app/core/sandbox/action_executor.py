@@ -19,7 +19,7 @@ class ActionResult:
     """动作执行结果"""
     actor_id: str
     actor_name: str
-    action: str
+    action: str = ""
     target: Optional[str] = None
     target_id: Optional[str] = None
     location: str = ""
@@ -91,6 +91,44 @@ class DeepSeekClient(BaseLLMClient):
                 else:
                     return None
         
+        return None
+
+
+class OpenAIClient(BaseLLMClient):
+    """OpenAI API客户端"""
+
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str = "https://api.openai.com/v1",
+        model: str = "gpt-4o-mini",
+        temperature: float = 0.8,
+        max_tokens: int = 300,
+        max_retries: int = 3,
+        retry_delay: float = 2.0
+    ):
+        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self.model = model
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+
+    async def generate(self, messages: List[Dict], **kwargs) -> Optional[str]:
+        for attempt in range(self.max_retries):
+            try:
+                response = await self.client.chat.completions.create(
+                    model=kwargs.get("model", self.model),
+                    messages=messages,
+                    temperature=kwargs.get("temperature", self.temperature),
+                    max_tokens=kwargs.get("max_tokens", self.max_tokens),
+                )
+                return response.choices[0].message.content.strip()
+            except Exception as e:
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay)
+                else:
+                    return None
         return None
 
 

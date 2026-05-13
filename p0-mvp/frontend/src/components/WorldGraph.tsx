@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import Cytoscape from 'cytoscape';
+import { World, Agent, Location } from '../api';
 
 interface WorldGraphProps {
+  worldData: World | null;
   events: any[];
   isSimulating: boolean;
 }
@@ -25,7 +27,7 @@ const nodeStyles = {
   },
 };
 
-export const WorldGraph: React.FC<WorldGraphProps> = ({ events, isSimulating }) => {
+export const WorldGraph: React.FC<WorldGraphProps> = ({ worldData, events, isSimulating }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Cytoscape.Core | null>(null);
 
@@ -135,50 +137,62 @@ export const WorldGraph: React.FC<WorldGraphProps> = ({ events, isSimulating }) 
 
   // 更新图谱数据
   useEffect(() => {
-    if (!cyRef.current || events.length === 0) return;
+    if (!cyRef.current) return;
 
     const { nodes, edges } = buildGraphData(events);
-    
+
+    if (nodes.length === 0) return;
+
     cyRef.current.elements().remove();
     cyRef.current.add(nodes);
     cyRef.current.add(edges);
-    
+
     cyRef.current.layout({
       name: 'cose',
       animate: true,
       animationDuration: 500,
     }).run();
-  }, [events]);
+  }, [worldData, events]);
 
   const buildGraphData = (events: any[]) => {
     const nodes: any[] = [];
     const edges: any[] = [];
     const nodeSet = new Set<string>();
+    const nodeNameMap = new Map<string, string>(); // id -> name mapping for event matching
 
-    // 添加基础节点
-    const baseNodes = [
-      { id: 'village', name: '雾隐村', type: 'location' },
-      { id: 'teahouse', name: '茶馆', type: 'location' },
-      { id: 'dock', name: '码头', type: 'location' },
-      { id: 'temple', name: '祠堂', type: 'location' },
-      { id: 'mayor', name: '李沉渊', type: 'character' },
-      { id: 'blacksmith', name: '张铁柱', type: 'character' },
-      { id: 'doctor', name: '沈墨白', type: 'character' },
-    ];
+    // 从 worldData 动态构建节点
+    if (worldData) {
+      // 添加地点节点
+      (worldData.locations || []).forEach((loc: Location) => {
+        if (!nodeSet.has(loc.id)) {
+          nodes.push({ data: { id: loc.id, name: loc.name, type: 'location' } });
+          nodeSet.add(loc.id);
+          nodeNameMap.set(loc.id, loc.name);
+          nodeNameMap.set(loc.name, loc.id);
+        }
+      });
 
-    baseNodes.forEach(node => {
-      if (!nodeSet.has(node.id)) {
-        nodes.push(node);
-        nodeSet.add(node.id);
-      }
-    });
+      // 添加角色节点
+      (worldData.agents || []).forEach((agent: Agent) => {
+        const agentId = agent.agent_id;
+        if (!nodeSet.has(agentId)) {
+          nodes.push({ data: { id: agentId, name: agent.name || agent.config?.name, type: 'character' } });
+          nodeSet.add(agentId);
+          nodeNameMap.set(agentId, agent.name || agent.config?.name);
+          nodeNameMap.set(agent.name || agent.config?.name, agentId);
+        }
+      });
+    }
 
     // 从事件中提取关系
     const interactions: Map<string, { count: number; type: string }> = new Map();
 
     events.slice(-50).forEach((event: any) => {
       if (event.target) {
-        const key = `${event.actor}_${event.target}`;
+        // 尝试将 actor/target 名称解析为节点 ID
+        const sourceId = nodeNameMap.get(event.actor) || event.actor;
+        const targetId = nodeNameMap.get(event.target) || event.target;
+        const key = `${sourceId}_${targetId}`;
         const existing = interactions.get(key) || { count: 0, type: 'interaction' };
         existing.count++;
         interactions.set(key, existing);

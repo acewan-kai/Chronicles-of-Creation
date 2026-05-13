@@ -5,6 +5,7 @@ B02 知识图谱
 
 import networkx as nx
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple, Any
 from enum import Enum
 import json

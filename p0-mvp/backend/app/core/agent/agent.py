@@ -95,17 +95,17 @@ class MemoryStream:
         
         return memory
     
-    def add_observation(self, content: str, turn: int) -> Memory:
+    def add_observation(self, content: str, turn: int, importance: float = 0.4) -> Memory:
         """添加观察记忆"""
-        return self.add(content, MemoryType.OBSERVATION, turn, importance=0.4)
-    
-    def add_action(self, content: str, turn: int) -> Memory:
+        return self.add(content, MemoryType.OBSERVATION, turn, importance=importance)
+
+    def add_action(self, content: str, turn: int, importance: float = 0.6) -> Memory:
         """添加动作记忆"""
-        return self.add(content, MemoryType.ACTION, turn, importance=0.6)
-    
-    def add_reflection(self, content: str, turn: int) -> Memory:
+        return self.add(content, MemoryType.ACTION, turn, importance=importance)
+
+    def add_reflection(self, content: str, turn: int, importance: float = 0.8) -> Memory:
         """添加反思记忆"""
-        return self.add(content, MemoryType.REFLECTION, turn, importance=0.8)
+        return self.add(content, MemoryType.REFLECTION, turn, importance=importance)
     
     def add_plan(self, content: str, turn: int) -> Memory:
         """添加计划记忆"""

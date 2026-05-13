@@ -24,3 +24,14 @@ node_modules/
 dist/
 build/
 *.egg
+
+# AI assistant internals
+.claude/
+.codebuddy/
+
+# Deployment scripts (may contain secrets)
+p0-mvp/deploy.*
+p0-mvp/install.sh
+
+# Local runtime data
+p0-mvp/backend/data/

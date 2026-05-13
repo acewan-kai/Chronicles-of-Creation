@@ -140,6 +140,7 @@ class TurnScheduler:
                     task_id, status, data = result
                     if status == "error":
                         metrics.fallback_count += 1
+                        print(f"  NPC-{task_id} 错误: {data[:200]}")
             
             metrics.status = TurnStatus.COMPLETED
             

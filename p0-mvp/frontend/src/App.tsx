@@ -4,10 +4,11 @@ import { EventTimeline } from './components/EventTimeline';
 import { AgentList } from './components/AgentList';
 import { MetricsPanel } from './components/MetricsPanel';
 import { OnboardingGuide } from './components/OnboardingGuide';
-import { api, World, Event } from './api';
+import { CreateWorldModal } from './components/CreateWorldModal';
+import { api, World, Event, Agent, Location } from './api';
 
 function App() {
-  const [worldId, setWorldId] = useState<string>('foggy-village');
+  const [worldId, setWorldId] = useState<string>('');
   const [worlds, setWorlds] = useState<World[]>([]);
   const [activeTab, setActiveTab] = useState<'graph' | 'timeline'>('graph');
   const [isSimulating, setIsSimulating] = useState(false);
@@ -16,6 +17,8 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [apiVersion, setApiVersion] = useState<string>('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [worldData, setWorldData] = useState<World | null>(null);
 
   // 加载世界列表
   useEffect(() => {
@@ -24,11 +27,13 @@ function App() {
 
   // 加载数据
   useEffect(() => {
-    loadData();
+    if (worldId) {
+      loadData();
+    }
     
     // 轮询更新
     const interval = setInterval(() => {
-      if (isSimulating) {
+      if (isSimulating && worldId) {
         loadData();
       }
     }, 5000);
@@ -40,35 +45,48 @@ function App() {
     try {
       const data = await api.getInfo();
       setApiVersion(data.version || '0.1.0');
-      
+
       // 尝试获取世界列表
+      let worldsData: World[] = [];
       try {
-        const worldsData = await api.getWorlds();
+        worldsData = await api.getWorlds();
         setWorlds(worldsData);
-        if (worldsData.length > 0 && !worldsData.find((w: World) => w.id === worldId)) {
+        if (worldsData.length > 0) {
           setWorldId(worldsData[0].id);
         }
       } catch {
-        // API尚未实现，使用默认世界
-        setWorlds([
-          { id: 'foggy-village', name: '雾隐村', description: '一个被迷雾笼罩的神秘村落' }
-        ]);
+        console.warn('Worlds API not implemented');
+      }
+      // 无世界时自动弹出创建弹窗
+      if (worldsData.length === 0) {
+        setShowCreateModal(true);
       }
       setLoading(false);
-    } catch (err) {
-      setError('无法连接到服务器');
+    } catch (err: any) {
+      setError(err.message || '无法连接到服务器');
       setLoading(false);
     }
   };
 
+  const handleWorldCreated = (newWorldId: string) => {
+    setShowCreateModal(false);
+    setWorldId(newWorldId);
+    // 重新加载世界列表以获取新世界
+    api.getWorlds().then(data => {
+      setWorlds(data);
+    }).catch(() => {});
+  };
+
   const loadData = async () => {
     try {
-      const [eventsData, metricsData] = await Promise.all([
+      const [eventsData, metricsData, worldDetail] = await Promise.all([
         api.getEvents(worldId).catch(() => []),
-        api.getMetrics(worldId).catch(() => null)
+        api.getMetrics(worldId).catch(() => null),
+        api.getWorld(worldId).catch(() => null)
       ]);
       setEvents(eventsData);
       setMetrics(metricsData);
+      setWorldData(worldDetail);
     } catch (err) {
       console.error('Failed to load data:', err);
     }
@@ -109,7 +127,7 @@ function App() {
       <div className="app-error">
         <h2>连接失败</h2>
         <p>{error}</p>
-        <p className="error-hint">请确保后端服务正在运行</p>
+        <p className="error-hint">请确保后端服务正在运行（端口 8000）</p>
         <button onClick={loadWorlds} className="btn btn-primary">
           重试连接
         </button>
@@ -125,8 +143,8 @@ function App() {
           <span className="api-version">API v{apiVersion}</span>
         </div>
         <div className="header-actions">
-          <select 
-            value={worldId} 
+          <select
+            value={worldId}
             onChange={(e) => setWorldId(e.target.value)}
             className="world-select"
           >
@@ -136,7 +154,15 @@ function App() {
               </option>
             ))}
           </select>
-          
+
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn btn-secondary"
+            title="创建新世界"
+          >
+            + 创建世界
+          </button>
+
           {isSimulating ? (
             <button onClick={stopSimulation} className="btn btn-danger">
               <span className="btn-icon">⏹</span>
@@ -154,7 +180,7 @@ function App() {
       <main className="app-main">
         <aside className="sidebar">
           <MetricsPanel metrics={metrics} />
-          <AgentList agents={events} />
+          <AgentList agents={worldData?.agents || []} events={events} />
         </aside>
 
         <div className="content">
@@ -177,8 +203,9 @@ function App() {
             {events.length === 0 && !isSimulating ? (
               <OnboardingGuide onStart={startSimulation} />
             ) : activeTab === 'graph' ? (
-              <WorldGraph 
-                events={events} 
+              <WorldGraph
+                worldData={worldData}
+                events={events}
                 isSimulating={isSimulating}
               />
             ) : (
@@ -193,6 +220,13 @@ function App() {
           <span className="pulse"></span>
           模拟运行中
         </div>
+      )}
+
+      {showCreateModal && (
+        <CreateWorldModal
+          onCreated={handleWorldCreated}
+          onClose={() => setShowCreateModal(false)}
+        />
       )}
     </div>
   );
