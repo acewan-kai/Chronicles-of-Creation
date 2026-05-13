@@ -42,12 +42,12 @@
 | S1-5 | LLM适配层(DeepSeek/OpenAI/Mock) | ✅ 三模式可切换 |
 | S1-6 | 端到端测试 | ✅ 创建→启动→事件→停止 |
 
-### Sprint 2: 智能体 + 知识图谱 — ⚠️ 30%
+### Sprint 2: 智能体 + 知识图谱 — ✅ 60%
 
 | # | 任务 | 状态 |
 |---|------|------|
-| S2-1 | MemoryStream遗忘曲线 | ❌ |
-| S2-2 | Planner LLM集成 | ⚠️ 骨架存在 |
+| S2-1 | MemoryStream遗忘曲线 | ✅ 艾宾浩斯公式, avg_retention=80.7% |
+| S2-2 | Planner LLM集成 | ✅ LLM生成3步计划, 角色化Mock fallback |
 | S2-3 | Reflector周期性反思 | ⚠️ 20轮触发，简化实现 |
 | S2-4 | KnowledgeGraph动态更新 | ❌ |
 | S2-5 | Lorebook上下文注入 | ❌ YAML模板已有 |
