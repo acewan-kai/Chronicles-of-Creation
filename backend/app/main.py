@@ -920,6 +920,28 @@ async def get_world(world_id: str):
     return world_data
 
 
+@app.patch("/api/worlds/{world_id}/agents/{agent_id}", tags=["世界管理"], summary="更新角色信息", description="修改NPC的名称、身份、性格等属性。用于用户自定义角色。")
+async def update_agent(world_id: str, agent_id: str, req: dict):
+    """更新角色信息"""
+    ctx = simulations.get(world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    agent = ctx.agents.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # 更新字段
+    if "name" in req:
+        agent.config.name = req["name"]
+    if "identity" in req:
+        agent.config.identity = req["identity"]
+    if "personality" in req:
+        agent.config.personality = req["personality"]
+
+    return {"agent": agent.to_dict()}
+
+
 @app.get("/api/worlds/{world_id}/events", tags=["世界管理"], summary="查询世界事件", description="获取AI角色在模拟中生成的事件日志。支持多种筛选：by_turn(按回合)、by_actor(按角色名)、by_type(按类型normal/interaction/story_moment)、by_location(按地点)、min_turn+max_turn(回合范围)。**测试第六步**：查看AI角色的行为和互动。")
 async def get_world_events(
     world_id: str,
@@ -1274,6 +1296,71 @@ async def get_dialogue_history(req: DialogueHistoryRequest):
         return {"dialogue": None, "message": "No dialogue history found"}
 
     return {"dialogue": ctx.dialogue_manager.to_dict(dialogue)}
+
+
+# ═══════════════════════════════════════════════════════════
+# Novel Export API — 小说导出
+# ═══════════════════════════════════════════════════════════
+
+class NovelExportRequest(BaseModel):
+    world_id: str
+    start_turn: int = Field(1, description="起始回合")
+    end_turn: Optional[int] = Field(None, description="结束回合")
+    include_dialogue: bool = Field(True, description="包含对话")
+    format: str = Field("markdown", description="导出格式: markdown/html")
+
+
+@app.post("/api/novel/export", tags=["小说导出"], summary="导出小说", description="将世界的事件和对话导出为可读的小说格式（Markdown或HTML）。")
+async def export_novel(req: NovelExportRequest):
+    """导出小说"""
+    ctx = simulations.get(req.world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    # 获取事件
+    events = []
+    if ctx.event_store:
+        current_max = ctx.world_state.current_turn if ctx.world_state else 100
+        event_objs = await ctx.event_store.query(
+            turn_range=(req.start_turn, req.end_turn or current_max),
+            limit=5000
+        )
+        events = [e.to_dict() for e in event_objs]
+
+    # 获取对话历史
+    dialogues = []
+    if ctx.dialogue_manager:
+        for (a_id, b_id), dlg in ctx.dialogue_manager._dialogues.items():
+            dialogues.append(ctx.dialogue_manager.to_dict(dlg))
+
+    # 世界信息
+    world_info = {
+        "name": worlds_db.get(req.world_id, {}).get("name", "未命名"),
+        "template": worlds_db.get(req.world_id, {}).get("template", "unknown")
+    }
+
+    # 导出小说
+    from app.core.novel.novel_exporter import NovelExporter
+
+    exporter = NovelExporter(events, dialogues, world_info)
+    result = exporter.export(format=req.format)
+
+    return {
+        "novel": result.title,
+        "world_name": result.world_name,
+        "template": result.template,
+        "chapters": [
+            {
+                "num": ch.chapter_num,
+                "title": ch.title,
+                "turns": ch.turns_covered,
+            }
+            for ch in result.chapters
+        ],
+        "total_events": result.total_events,
+        "total_dialogues": result.total_dialogues,
+        "content_markdown": result.to_markdown() if req.format == "markdown" else result.to_html(),
+    }
 
 
 # ═══════════════════════════════════════════════════════════
