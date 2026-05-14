@@ -1473,6 +1473,40 @@ async def simulate_stop(req: dict):
     return {"status": "stopped", "world_id": world_id}
 
 
+@app.post("/api/simulate/pause", tags=["模拟控制"], summary="暂停模拟", description="暂停指定世界的模拟运行。可通过 /simulate/resume 恢复。")
+async def simulate_pause(req: dict):
+    """暂停模拟"""
+    world_id = req.get("world_id", "")
+    if not world_id:
+        raise HTTPException(status_code=400, detail="world_id required")
+
+    ctx = simulations.get(world_id)
+    if ctx and ctx.scheduler:
+        ctx.scheduler.pause()
+
+    if world_id in worlds_db:
+        worlds_db[world_id]["status"] = "paused"
+
+    return {"status": "paused", "world_id": world_id}
+
+
+@app.post("/api/simulate/resume", tags=["模拟控制"], summary="恢复模拟", description="恢复已暂停的模拟。")
+async def simulate_resume(req: dict):
+    """恢复模拟"""
+    world_id = req.get("world_id", "")
+    if not world_id:
+        raise HTTPException(status_code=400, detail="world_id required")
+
+    ctx = simulations.get(world_id)
+    if ctx and ctx.scheduler:
+        ctx.scheduler.resume()
+
+    if world_id in worlds_db:
+        worlds_db[world_id]["status"] = "running"
+
+    return {"status": "resumed", "world_id": world_id}
+
+
 @app.post("/api/worlds/{world_id}/reset", tags=["世界管理"], summary="重置世界", description="停止模拟并重置世界到初始状态（保留配置但清空事件和记忆）。用于重新运行同一世界设定。")
 async def reset_world(world_id: str):
     """重置世界"""
