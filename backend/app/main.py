@@ -1507,6 +1507,84 @@ async def simulate_resume(req: dict):
     return {"status": "resumed", "world_id": world_id}
 
 
+@app.post("/api/simulate/step", tags=["模拟控制"], summary="单步执行", description="让模拟前进指定回合数。请求体：{\"world_id\": \"xxx\", \"turns\": N}。用于细粒度控制模拟进度。")
+async def simulate_step(req: dict):
+    """单步执行模拟"""
+    world_id = req.get("world_id", "")
+    turns = req.get("turns", 1)
+
+    if not world_id:
+        raise HTTPException(status_code=400, detail="world_id required")
+
+    ctx = simulations.get(world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found or simulation not initialized")
+
+    # 如果模拟未运行，先启动
+    if not ctx.is_running:
+        worlds_db[world_id]["status"] = "running"
+        ctx._running = True
+
+    # 执行指定回合数
+    from app.core.sandbox.turn_scheduler import TurnScheduler
+    scheduler = ctx.scheduler or TurnScheduler(total_turns=100)
+
+    current_turn = ctx.world_state.current_turn if ctx.world_state else 0
+    end_turn = min(current_turn + turns, 100)
+
+    # 构建NPC任务
+    async def run_turns():
+        for turn in range(current_turn + 1, end_turn + 1):
+            tasks = []
+            for agent in ctx.agents.values():
+                tasks.append(_make_npc_task(agent, turn, ctx))
+            await scheduler.run_turn(turn, tasks)
+            # 保存事件
+            for agent_id, result in zip(ctx.agents.keys(), tasks):
+                if result and hasattr(result, 'action'):
+                    from app.core.events.event_store import Event
+                    event = Event(
+                        turn=turn,
+                        actor_id=agent_id,
+                        actor_name=ctx.agents[agent_id].config.name,
+                        action=result.action,
+                        action_type=result.action_type or "normal",
+                        location=result.location or "",
+                    )
+                    if ctx.event_store:
+                        await ctx.event_store.save(event)
+
+    try:
+        await run_turns()
+    except Exception as e:
+        return {"status": "error", "world_id": world_id, "message": str(e)}
+
+    return {
+        "status": "stepped",
+        "world_id": world_id,
+        "from_turn": current_turn,
+        "to_turn": end_turn,
+        "events_generated": turns
+    }
+
+
+def _make_npc_task(agent, turn, ctx):
+    """为NPC创建任务"""
+    async def task():
+        from app.core.sandbox.action_result import ActionResult
+        # 简单的模拟任务
+        return ActionResult(
+            actor_id=agent.agent_id,
+            actor_name=agent.config.name,
+            action=f"{agent.config.name} 在回合 {turn} 行动",
+            target=None,
+            target_name=None,
+            location=agent.current_location or "未知",
+            action_type="normal",
+        )
+    return task
+
+
 @app.post("/api/worlds/{world_id}/reset", tags=["世界管理"], summary="重置世界", description="停止模拟并重置世界到初始状态（保留配置但清空事件和记忆）。用于重新运行同一世界设定。")
 async def reset_world(world_id: str):
     """重置世界"""
