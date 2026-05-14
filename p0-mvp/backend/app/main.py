@@ -572,6 +572,11 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
     """后台模拟循环"""
     ctx._running = True
 
+    # 构建 name→agent_id 映射（用于解析LLM输出的目标名称）
+    name_to_id: dict[str, str] = {}
+    for aid, agent in ctx.agents.items():
+        name_to_id[agent.config.name] = aid
+
     try:
         for turn in range(1, total_turns + 1):
             if not ctx._running:
@@ -624,6 +629,17 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                         raw_response=result.raw_response
                     )
                     await ctx.event_store.save(event)
+
+                    # 动态更新知识图谱关系边
+                    if result.target:
+                        target_id = name_to_id.get(result.target, result.target)
+                        if target_id in ctx.agents or target_id in ctx.knowledge_graph.nodes:
+                            ctx.knowledge_graph.update_relation_dynamic(
+                                source_id=result.actor_id,
+                                target_id=target_id,
+                                interaction_type=result.action_type,
+                                action_description=result.action,
+                            )
 
                     # 用量追踪
                     usage_tracker.record_npc_action(
@@ -723,6 +739,7 @@ async def get_world(world_id: str):
             for loc in ctx.world_state.locations.values()
         ] if ctx.world_state else []
         world_data["graph_stats"] = ctx.knowledge_graph.get_statistics() if ctx.knowledge_graph else {}
+        world_data["graph_edges"] = ctx.knowledge_graph.get_edges_for_api() if ctx.knowledge_graph else []
 
     return world_data
 

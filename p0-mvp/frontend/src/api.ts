@@ -51,6 +51,14 @@ export interface Location {
   description: string;
 }
 
+export interface GraphEdge {
+  source: string;
+  target: string;
+  type: string;  // "knows", "friend", "enemy"
+  weight: number;
+  description: string;
+}
+
 export interface World {
   id: string;
   name: string;
@@ -64,6 +72,7 @@ export interface World {
     node_types: Record<string, number>;
     avg_degree: number;
   };
+  graph_edges?: GraphEdge[];
 }
 
 export interface Event {

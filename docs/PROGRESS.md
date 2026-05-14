@@ -1,6 +1,6 @@
 # 项目进度文档
 
-> 最后更新: 2026-05-13 12:25 (P0 MVP 部署验收完成)
+> 最后更新: 2026-05-13 23:22 (S2-4 KnowledgeGraph动态更新完成)
 
 ## 快速恢复指南（下次开工读这里）
 
@@ -10,7 +10,7 @@
 前端部署: cd p0-mvp/frontend && npx vite build && scp -i ~/.ssh/claw.pem -r dist/* ubuntu@170.106.194.111:~/p0-mvp-frontend/
 代码已提交: ✅ git commit完成 (2026-05-13)
 当前状态: P0 MVP 部署验收完成，Sprint 1 100% + Sprint 2~30% + Sprint 3~80%
-下一优先: P1 Planner LLM集成 + MemoryStream遗忘曲线 + EventTimeline筛选
+下一优先: S2-3 Reflector LLM化 + S2-5 Lorebook上下文注入 + EventTimeline筛选
 ```
 
 ---
@@ -42,14 +42,14 @@
 | S1-5 | LLM适配层(DeepSeek/OpenAI/Mock) | ✅ 三模式可切换 |
 | S1-6 | 端到端测试 | ✅ 创建→启动→事件→停止 |
 
-### Sprint 2: 智能体 + 知识图谱 — ✅ 60%
+### Sprint 2: 智能体 + 知识图谱 — ✅ 75%
 
 | # | 任务 | 状态 |
 |---|------|------|
 | S2-1 | MemoryStream遗忘曲线 | ✅ 艾宾浩斯公式, avg_retention=80.7% |
 | S2-2 | Planner LLM集成 | ✅ LLM生成3步计划, 角色化Mock fallback |
 | S2-3 | Reflector周期性反思 | ⚠️ 20轮触发，简化实现 |
-| S2-4 | KnowledgeGraph动态更新 | ❌ |
+| S2-4 | KnowledgeGraph动态更新 | ✅ 互动事件驱动关系边创建/权重变化/类型升级 |
 | S2-5 | Lorebook上下文注入 | ❌ YAML模板已有 |
 | S2-6 | World Info预算管理 | ❌ |
 | S2-7 | 行为一致性评测 | ❌ |
@@ -84,7 +84,7 @@
 |------|------|------|
 | sandbox/ | world_state, turn_scheduler, action_executor, event_dispatcher | ✅ |
 | events/ | event_store(SQLite+JSONL), query_engine | ✅ |
-| knowledge/ | knowledge_graph, lorebook | ⚠️ 基础完成 |
+| knowledge/ | knowledge_graph, lorebook | ✅ 动态关系更新 |
 | agent/ | agent(MemoryStream), planner(简化), reflector(简化) | ⚠️ 骨架 |
 | scoring/ | scorer(AestheticScorer) | ✅ |
 | - | onboarding, usage_tracker | ✅ |

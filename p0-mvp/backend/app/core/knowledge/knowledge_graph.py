@@ -121,12 +121,127 @@ class KnowledgeGraph:
     
     def add_relation(self, relation: KnowledgeRelation):
         """添加关系"""
+        # Remove existing edges between same nodes with same key before re-adding
+        key = relation.relation_type.value
+        if self.graph.has_edge(relation.source, relation.target, key=key):
+            self.graph.remove_edge(relation.source, relation.target, key=key)
         self.graph.add_edge(
             relation.source,
             relation.target,
-            key=relation.relation_type.value,
+            key=key,
             **relation.to_dict()
         )
+
+    def _find_character_edge(self, source_id: str, target_id: str) -> Optional[KnowledgeRelation]:
+        """Find existing edge between two characters (checks both directions)"""
+        if source_id not in self.nodes or target_id not in self.nodes:
+            return None
+        for u, v, data in self.graph.edges(data=True):
+            if (u == source_id and v == target_id) or (u == target_id and v == source_id):
+                return KnowledgeRelation(
+                    source=u, target=v,
+                    relation_type=RelationType(data.get("type", "knows")),
+                    weight=data.get("weight", 1.0),
+                    description=data.get("description", ""),
+                    properties=data.get("properties", {}),
+                )
+        return None
+
+    def update_relation_dynamic(
+        self,
+        source_id: str,
+        target_id: str,
+        interaction_type: str = "normal",
+        action_description: str = "",
+    ) -> Optional[KnowledgeRelation]:
+        """根据互动事件动态更新角色间关系边"""
+        if source_id == target_id:
+            return None
+        if source_id not in self.nodes or target_id not in self.nodes:
+            return None
+
+        existing = self._find_character_edge(source_id, target_id)
+
+        if existing:
+            delta, new_type = self._calc_relation_delta(existing, interaction_type, action_description)
+            new_weight = round(max(0.05, min(2.0, existing.weight + delta)), 2)
+            rel_type = new_type or existing.relation_type
+
+            # Remove old edge and add updated one
+            self.graph.remove_edge(existing.source, existing.target)
+            updated = KnowledgeRelation(
+                source=source_id, target=target_id,
+                relation_type=rel_type,
+                weight=new_weight,
+                description=existing.description or action_description,
+                properties={**existing.properties, "last_action": action_description[:60]},
+            )
+            self.add_relation(updated)
+            return updated
+        else:
+            new_rel = KnowledgeRelation(
+                source=source_id, target=target_id,
+                relation_type=RelationType.KNOWS,
+                weight=0.25,
+                description=action_description[:100] if action_description else "初次接触",
+            )
+            self.add_relation(new_rel)
+            return new_rel
+
+    @staticmethod
+    def _calc_relation_delta(
+        rel: KnowledgeRelation,
+        interaction_type: str,
+        action_description: str = "",
+    ) -> tuple:
+        """计算关系权重变化量和可能的类型升级"""
+        HOSTILE_KEYWORDS = ["攻击", "偷袭", "背叛", "暗算", "威胁", "挑衅", "嫁祸", "下毒",
+                            "attack", "betray", "threaten", "poison", "stab", "ambush"]
+
+        is_hostile = any(kw in action_description for kw in HOSTILE_KEYWORDS)
+
+        if is_hostile:
+            if rel.relation_type == RelationType.FRIEND:
+                return -0.3, RelationType.KNOWS  # Degrade
+            elif rel.relation_type == RelationType.KNOWS:
+                if rel.weight <= 0.15:
+                    return -0.1, RelationType.ENEMY  # Become enemies
+                return -0.15, None
+            else:  # Already ENEMY
+                return -0.1, None
+
+        # Positive interactions
+        if interaction_type == "story_moment":
+            if rel.relation_type == RelationType.ENEMY:
+                return 0.05, None
+            elif rel.relation_type == RelationType.KNOWS and rel.weight >= 0.7:
+                return 0.15, RelationType.FRIEND
+            return 0.15, None
+        elif interaction_type == "interaction":
+            if rel.relation_type == RelationType.ENEMY:
+                return 0.03, None
+            elif rel.relation_type == RelationType.KNOWS and rel.weight >= 0.8:
+                return 0.1, RelationType.FRIEND
+            return 0.1, None
+        else:  # normal
+            return 0.03, None
+
+    def get_edges_for_api(self) -> list:
+        """Return simplified edge list for frontend consumption"""
+        edges = []
+        for u, v, data in self.graph.edges(data=True):
+            # Only return character-to-character edges (skip structural edges)
+            rel_type = data.get("type", "knows")
+            if rel_type in ("located_at", "belongs_to", "owned_by", "participated_in"):
+                continue
+            edges.append({
+                "source": u,
+                "target": v,
+                "type": rel_type,
+                "weight": data.get("weight", 1.0),
+                "description": data.get("description", ""),
+            })
+        return edges
     
     def get_relations(
         self,

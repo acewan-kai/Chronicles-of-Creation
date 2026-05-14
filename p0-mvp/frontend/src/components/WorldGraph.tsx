@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import Cytoscape from 'cytoscape';
-import { World, Agent, Location } from '../api';
+import { World, Agent, Location, GraphEdge } from '../api';
 
 interface WorldGraphProps {
   worldData: World | null;
@@ -189,7 +189,6 @@ export const WorldGraph: React.FC<WorldGraphProps> = ({ worldData, events, isSim
 
     events.slice(-50).forEach((event: any) => {
       if (event.target) {
-        // 尝试将 actor/target 名称解析为节点 ID
         const sourceId = nodeNameMap.get(event.actor) || event.actor;
         const targetId = nodeNameMap.get(event.target) || event.target;
         const key = `${sourceId}_${targetId}`;
@@ -199,19 +198,39 @@ export const WorldGraph: React.FC<WorldGraphProps> = ({ worldData, events, isSim
       }
     });
 
-    // 添加边
+    // 添加事件互动边
     interactions.forEach((data, key) => {
       const [source, target] = key.split('_');
       if (nodeSet.has(source) && nodeSet.has(target)) {
         edges.push({
           data: {
-            id: `edge_${key}`,
+            id: `evt_${key}`,
             source,
             target,
             type: 'interaction',
             label: `${data.count}次互动`,
           },
         });
+      }
+    });
+
+    // 添加知识图谱关系边（friend/enemy/knows）
+    (worldData.graph_edges || []).forEach((ge: GraphEdge) => {
+      if (nodeSet.has(ge.source) && nodeSet.has(ge.target)) {
+        const edgeId = `kg_${ge.source}_${ge.target}_${ge.type}`;
+        // 避免与事件边重复
+        if (!edges.some(e => e.data.id === edgeId)) {
+          edges.push({
+            data: {
+              id: edgeId,
+              source: ge.source,
+              target: ge.target,
+              type: ge.type,
+              weight: ge.weight,
+              label: `${ge.type} (${(ge.weight * 100).toFixed(0)}%)`,
+            },
+          });
+        }
       }
     });
 
