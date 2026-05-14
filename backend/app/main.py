@@ -32,6 +32,7 @@ from app.core.agent.reflector import Reflector
 from app.core.ws_manager import ws_manager
 from app.core.scoring.scorer import AestheticScorer
 from app.core.scoring.behavior_evaluator import BehaviorEvaluator, EvalTracker
+from app.core.sandbox.narrative_extractor import NarrativeExtractor
 from app.core.usage_tracker import UsageTracker
 from app.core.onboarding import OnboardingGuide
 
@@ -1065,6 +1066,62 @@ async def get_world_metrics(world_id: str):
 
 
 @app.post("/api/worlds/{world_id}/start", tags=["模拟控制"], summary="启动模拟(旧路径)", description="旧版启动端点。推荐使用 POST /simulate/start 传入 {\"world_id\": \"xxx\"} 格式。")
+# ═══════════════════════════════════════════════════════════
+# Narrative API — A05 叙事提取引擎
+# ═══════════════════════════════════════════════════════════
+
+class NarrativeExtractRequest(BaseModel):
+    world_id: str
+    min_turn: Optional[int] = Field(1, description="起始回合")
+    max_turn: Optional[int] = Field(None, description="结束回合")
+    max_events: int = Field(50, description="最大事件数")
+
+
+@app.post("/api/narrative/extract", tags=["叙事提取"], summary="提取叙事章节", description="将指定回合范围内的事件序列转化为带起承转合结构的叙事章节文本。")
+async def extract_narrative(req: NarrativeExtractRequest):
+    """A05 叙事提取引擎API"""
+    ctx = simulations.get(req.world_id)
+    if not ctx or not ctx.query_engine:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    # 查询事件
+    if req.max_turn:
+        events = await ctx.query_engine.get_events_by_turns(req.min_turn, req.max_turn)
+    else:
+        events = await ctx.query_engine.store.query(
+            turn_range=(req.min_turn, 9999),
+            limit=req.max_events
+        )
+
+    if not events:
+        return {"chapter": None, "message": "No events found in specified range"}
+
+    # 使用叙事提取器
+    extractor = NarrativeExtractor(max_turns_per_chapter=20)
+    llm_client = ctx.executor.llm_client if ctx.executor else None
+
+    chapter = await extractor.extract(events, llm_client=llm_client)
+
+    return {"chapter": extractor.to_dict(chapter)}
+
+
+@app.get("/api/worlds/{world_id}/narrative/preview", tags=["世界管理"], summary="预览章节叙事", description="快速预览指定回合范围内的事件叙事（轻量版，不调用LLM）。")
+async def preview_narrative(world_id: str, min_turn: int = 1, max_turn: int = 20):
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.query_engine:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    events = await ctx.query_engine.get_events_by_turns(min_turn, max_turn)
+    if not events:
+        return {"preview": None, "message": "No events found"}
+
+    extractor = NarrativeExtractor()
+    # 使用fallback模式（无LLM）
+    chapter = await extractor.extract(events, llm_client=None)
+
+    return {"preview": extractor.to_dict(chapter)}
+
+
 # ═══════════════════════════════════════════════════════════
 # WebSocket 实时推送
 # ═══════════════════════════════════════════════════════════
