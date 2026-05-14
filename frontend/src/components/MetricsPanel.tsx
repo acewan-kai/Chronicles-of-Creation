@@ -14,6 +14,12 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({ metrics }) => {
     );
   }
 
+  const moodEmoji: Record<string, string> = {
+    "平静": "😌", "暗流涌动": "🌊", "紧张": "😰", "危机四伏": "⚠️",
+    "风雨欲来": "🌧️", "动荡": "🔥", "混乱": "💥", "希望萌芽": "🌱",
+    "重整旗鼓": "⚔️", "新秩序": "🏛️",
+  };
+
   const getStatusClass = (value: number, threshold: number) => {
     if (value >= threshold) return 'status-good';
     if (value >= threshold * 0.7) return 'status-warning';
@@ -24,6 +30,13 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({ metrics }) => {
     <div className="metrics-panel">
       <h3>运行指标</h3>
       
+      {metrics.world_mood && (
+        <div className="world-mood-indicator">
+          {moodEmoji[metrics.world_mood] || '🎭'} 世界氛围: {metrics.world_mood}
+          {metrics.current_turn && ` · 第${metrics.current_turn}回合`}
+        </div>
+      )}
+
       <div className="metrics-grid">
         <div className="metric-card">
           <div className="metric-value">{metrics.total_events || 0}</div>

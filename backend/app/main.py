@@ -647,6 +647,8 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
 
     # 预算管理：追踪近期互动目标
     recent_targets: set[str] = set()
+    # 验收指标累计 (用dict绕过Python闭包nonlocal限制)
+    _gauges: dict[str, float] = {"interactions": 0, "story_moments": 0, "elapsed": 0.0, "actions": 0}
 
     try:
         for turn in range(1, total_turns + 1):
@@ -751,11 +753,17 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                         action_type=result.action_type
                     )
 
-                    # 追踪近期互动目标
+                    # 追踪近期互动目标 + 验收指标计数
                     if result.target:
                         target_id = name_to_id.get(result.target, result.target)
                         if target_id in ctx.agents:
                             recent_targets.add(target_id)
+                    if result.action_type == "interaction":
+                        _gauges["interactions"] += 1
+                    elif result.action_type == "story_moment":
+                        _gauges["story_moments"] += 1
+                    _gauges["elapsed"] += result.elapsed_time
+                    _gauges["actions"] += 1
 
                     # 行为一致性评测
                     if ctx.behavior_evaluator:
@@ -833,6 +841,15 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
             # 回合预算结算
             ctx.budget_manager.finish_turn()
 
+            # 计算实时验收指标
+            npc_alive = len(ctx.agents)
+            interactions = int(_gauges["interactions"])
+            story_moments = int(_gauges["story_moments"])
+            total_acts = max(1, int(_gauges["actions"]))
+            avg_delay = round(_gauges["elapsed"] / total_acts, 2)
+            success_rate = round(metrics.success_count / max(1, metrics.npc_count) * 100, 1)
+            go_status = npc_alive >= 10 and interactions >= 3 and story_moments >= 1
+
             # WebSocket: 每回合结束推送状态快照
             await ws_manager.broadcast(ctx.world_id, "TURN_COMPLETE", {
                 "turn": turn,
@@ -840,9 +857,15 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                 "time_of_day": ctx.world_state.time_of_day,
                 "world_mood": ctx.world_state.world_mood,
                 "agents": [a.to_dict() for a in ctx.agents.values()],
-                "event_count": metrics.total_events,
+                "event_count": total_acts,
                 "success_count": metrics.success_count,
-                "npc_count": metrics.npc_count,
+                "success_rate": success_rate,
+                "npc_count": npc_alive,
+                "total_npcs_alive": npc_alive,
+                "interactions": interactions,
+                "story_moments": story_moments,
+                "avg_delay": avg_delay,
+                "go_status": go_status,
                 "graph_edges": ctx.knowledge_graph.get_edges_for_api(),
                 "budget": ctx.budget_manager.get_stats(),
                 "behavior": ctx.eval_tracker.get_summary() if ctx.eval_tracker else {},

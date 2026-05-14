@@ -1176,6 +1176,17 @@ body {
   cursor: not-allowed;
 }
 
+/* ── World Mood (S3-2) ───────────────────────────────── */
+.world-mood-indicator {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  padding: 0.4rem 0.6rem;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  margin-bottom: 0.6rem;
+  text-align: center;
+}
+
 /* ── Budget Panel (S2-6 World Info 预算管理) ──────────────── */
 .budget-panel {
   margin-top: 1rem;
