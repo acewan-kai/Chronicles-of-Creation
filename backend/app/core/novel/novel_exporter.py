@@ -58,11 +58,12 @@ class NovelExportResult:
         """导出为HTML格式"""
         import html
         content = html.escape(self.to_markdown())
+        content_br = content.replace('\n', '<br>')
         return f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>{html.escape(self.title)}</title></head>
 <body>
-{content.replace('\n', '<br>')}
+{content_br}
 </body>
 </html>"""
 
@@ -165,11 +166,16 @@ class NovelExporter:
         scenes = []
         current_scene = {"events": [], "turns": (0, 0)}
 
+        if not self.events:
+            return [{"title": "楔子", "content": "这个世界尚未开始它的故事。", "turns": (0, 0)}]
+
         for event in self.events:
+            if not isinstance(event, dict):
+                continue
             turn = event.get("turn", 0)
-            event_type = event.get("type", "normal")
-            content = event.get("content", event.get("description", ""))
-            actor = event.get("actor", "未知")
+            event_type = event.get("type", event.get("action_type", "normal"))
+            content = event.get("content", event.get("action", ""))
+            actor = event.get("actor_name", event.get("actor", "未知"))
 
             # 对话类型事件单独处理
             if event_type == "interaction" and self._is_dialogue_event(event):
@@ -218,19 +224,19 @@ class NovelExporter:
 
     def _format_dialogue(self, event: Dict) -> str:
         """格式化对话"""
-        content = event.get("content", "")
-        actor = event.get("actor", "未知")
+        content = str(event.get("content", ""))
+        actor = event.get("actor_name", event.get("actor", "Unknown"))
         return f"「{actor}」{content}"
 
     def _finalize_scene(self, scene: Dict, num: int) -> Dict:
         """完成场景构建"""
         events = scene.get("events", [])
         if not events:
-            return {"title": f"第{num}章", "content": "", "turns": scene.get("turns", (0, 0))}
+            return {"title": f"Chapter {num}", "content": "", "turns": scene.get("turns", (0, 0))}
 
-        content = "\n\n".join(events)
+        content = "\n\n".join([str(e) for e in events])
         return {
-            "title": f"第{num}章",
+            "title": f"Chapter {num}",
             "content": content,
             "turns": scene.get("turns", (0, 0))
         }

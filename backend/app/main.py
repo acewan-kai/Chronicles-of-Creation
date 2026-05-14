@@ -1430,8 +1430,13 @@ async def export_novel(req: NovelExportRequest):
     # 导出小说
     from app.core.novel.novel_exporter import NovelExporter
 
-    exporter = NovelExporter(events, dialogues, world_info)
-    result = exporter.export(format=req.format)
+    try:
+        exporter = NovelExporter(events, dialogues, world_info)
+        result = exporter.export(format=req.format)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
     return {
         "novel": result.title,
