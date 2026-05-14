@@ -25,6 +25,7 @@ from app.core.events.event_store import EventStore, Event as DBEvent
 from app.core.events.query_engine import QueryEngine
 from app.core.knowledge.lorebook import Lorebook, LoreEntry
 from app.core.knowledge.knowledge_graph import KnowledgeGraph, KnowledgeNode, KnowledgeRelation, NodeType, RelationType
+from app.core.knowledge.budget_manager import BudgetManager
 from app.core.agent.agent import Agent, AgentConfig, MemoryStream
 from app.core.agent.planner import Planner
 from app.core.agent.reflector import Reflector
@@ -121,6 +122,7 @@ class SimulationContext:
         self.executor: Optional[ActionExecutor] = None
         self.knowledge_graph: Optional[KnowledgeGraph] = None
         self.lorebook: Optional[Lorebook] = None
+        self.budget_manager: Optional[BudgetManager] = None
         self._sim_task: Optional[asyncio.Task] = None
         self._running: bool = False
 
@@ -452,6 +454,7 @@ async def _init_world_simulation(world_id: str, template_id: str, world_name: st
     # 知识图谱
     ctx.knowledge_graph = KnowledgeGraph()
     ctx.lorebook = Lorebook()
+    ctx.budget_manager = BudgetManager(total_chars_per_turn=2000)
 
     # 世界状态
     template = TEMPLATE_WORLDS.get(template_id, TEMPLATE_WORLDS["cultivation"])
@@ -637,6 +640,9 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
     for aid, agent in ctx.agents.items():
         name_to_id[agent.config.name] = aid
 
+    # 预算管理：追踪近期互动目标
+    recent_targets: set[str] = set()
+
     try:
         for turn in range(1, total_turns + 1):
             if not ctx._running:
@@ -644,18 +650,29 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
 
             ctx.world_state.advance_turn()
 
+            # 每回合分配 Lorebook 注入预算
+            budgets = ctx.budget_manager.allocate(ctx.agents, recent_targets, turn)
+            recent_targets.clear()
+
             # 为每个NPC构建任务
             def make_npc_task(agent):
+                agent_budget = budgets.get(agent.agent_id, 400)
+
                 async def task():
                     situation = ctx.world_state.to_context()
                     system_prompt = agent.think(situation)
 
-                    # Lorebook上下文注入
+                    # Lorebook上下文注入（使用分配预算）
                     lore_context = ctx.lorebook.inject_context(
-                        system_prompt, max_chars=600
+                        system_prompt, max_chars=agent_budget
                     )
+                    chars_injected = len(lore_context) - len(system_prompt)
                     if lore_context != system_prompt:
                         system_prompt = lore_context
+                        ctx.budget_manager.track_usage(
+                            agent.agent_id, chars_injected,
+                            lore_entries=1
+                        )
 
                     user_prompt = f"当前时间：第{ctx.world_state.current_day}天 {ctx.world_state.time_of_day}\n你所在的{agent.current_location}，请决定你的下一步动作。"
 
@@ -729,6 +746,12 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                         action_type=result.action_type
                     )
 
+                    # 追踪近期互动目标
+                    if result.target:
+                        target_id = name_to_id.get(result.target, result.target)
+                        if target_id in ctx.agents:
+                            recent_targets.add(target_id)
+
                     return result
                 return task
 
@@ -780,6 +803,9 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                         if reflection:
                             agent.reflect_simple(reflection.summary, turn)
 
+            # 回合预算结算
+            ctx.budget_manager.finish_turn()
+
             # WebSocket: 每回合结束推送状态快照
             await ws_manager.broadcast(ctx.world_id, "TURN_COMPLETE", {
                 "turn": turn,
@@ -791,6 +817,7 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                 "success_count": metrics.success_count,
                 "npc_count": metrics.npc_count,
                 "graph_edges": ctx.knowledge_graph.get_edges_for_api(),
+                "budget": ctx.budget_manager.get_stats(),
             })
 
     finally:
@@ -926,6 +953,14 @@ def _event_to_dict(e) -> dict:
         "timestamp": e.timestamp,
         "world_mood": e.world_mood
     }
+
+
+@app.get("/api/worlds/{world_id}/budget", tags=["世界管理"], summary="Lorebook预算使用", description="获取World Info注入预算的分配与使用统计，按角色优先级排序。")
+async def get_world_budget(world_id: str):
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.budget_manager:
+        return {"budget": None, "message": "Budget manager not initialized"}
+    return {"budget": ctx.budget_manager.get_stats()}
 
 
 @app.get("/api/worlds/{world_id}/metrics", tags=["世界管理"], summary="世界运行指标", description="返回模拟的核心指标：回合数(turns)、事件总数(events)、NPC存活数、互动数(interactions)、故事时刻数(story_moments)、成功率(success_rate)、go_status(P0验收标准是否达标)。")

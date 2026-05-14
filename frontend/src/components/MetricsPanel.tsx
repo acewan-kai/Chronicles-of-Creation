@@ -102,6 +102,40 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({ metrics }) => {
           {metrics.go_status ? '通过验收标准' : '未通过验收标准'}
         </span>
       </div>
+
+      {metrics.budget && (
+        <div className="budget-panel">
+          <h4>Lorebook 预算</h4>
+          <div className="budget-bar-wrapper">
+            <div className="budget-bar-label">
+              {metrics.budget.total_used}/{metrics.budget.total_budget} 字符
+            </div>
+            <div className="budget-bar">
+              <div
+                className="budget-bar-fill"
+                style={{ width: `${Math.min(metrics.budget.usage_pct, 100)}%` }}
+              />
+            </div>
+            <div className="budget-bar-pct">{metrics.budget.usage_pct}%</div>
+          </div>
+          {metrics.budget.agents && (
+            <ul className="budget-agent-list">
+              {metrics.budget.agents.slice(0, 5).map((a: any) => (
+                <li key={a.agent_id} className="budget-agent-item">
+                  <span className="budget-agent-name">{a.name}</span>
+                  <span className="budget-agent-bar">
+                    <span
+                      className="budget-agent-fill"
+                      style={{ width: `${Math.min(a.usage_pct, 100)}%` }}
+                    />
+                  </span>
+                  <span className="budget-agent-pct">{a.usage_pct}%</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 };

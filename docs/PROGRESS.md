@@ -1,6 +1,6 @@
 # 项目进度文档
 
-> 最后更新: 2026-05-14 13:15 (S3-5 WebSocket实时推送——前后端实时事件流)
+> 最后更新: 2026-05-14 13:45 (S2-6 World Info预算管理——每回合Lorebook注入配额分配)
 
 ## 快速恢复指南（下次开工读这里）
 
@@ -12,7 +12,7 @@
 部署脚本: tools/deploy.bat (自动上传代码+构建+启动)
 代码已提交: ✅ git commit完成 (2026-05-14)
 当前状态: P0 MVP部署验收完成，Sprint 1 90% + Sprint 2 95% + Sprint 3 75%
-下一优先: S2-6 World Info预算管理 + S2-7 行为一致性评测 + S3-2 MetricsPanel接入验收指标
+下一优先: S2-7 行为一致性评测 + S3-2 MetricsPanel接入go_status验收指标
 项目结构: 标准布局 (backend/ + frontend/ + tools/ + docs/ + archive/ + .env)
 ```
 
@@ -45,7 +45,7 @@
 | S1-5 | LLM适配层(DeepSeek/OpenAI/Mock) | ✅ 三模式可切换 |
 | S1-6 | 端到端测试 | ✅ 创建→启动→事件→停止 |
 
-### Sprint 2: 智能体 + 知识图谱 — ✅ 95%
+### Sprint 2: 智能体 + 知识图谱 — ✅ 98%
 
 | # | 任务 | 状态 |
 |---|------|------|
@@ -54,7 +54,7 @@
 | S2-3 | Reflector周期性反思 | ✅ LLM驱动角色化反思, 三级fallback链, agent存储 |
 | S2-4 | KnowledgeGraph动态更新 | ✅ 互动事件驱动关系边创建/权重变化/类型升级 |
 | S2-5 | Lorebook上下文注入 | ✅ 模板自动构建词条, NPC prompt注入(600字限制) |
-| S2-6 | World Info预算管理 | ❌ |
+| S2-6 | World Info预算管理 | ✅ **本次完成** |
 | S2-7 | 行为一致性评测 | ❌ |
 
 ### Sprint 3: 前端仪表盘 — ✅ 85%
