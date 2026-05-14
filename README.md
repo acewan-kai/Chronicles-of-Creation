@@ -40,6 +40,15 @@
 ### 世界重置
 不必重新创建世界，直接重置到初始状态，保留你的角色配置设定，重新运行模拟。
 
+### 模拟控制
+支持暂停/恢复/单步执行模拟，更精细地控制模拟进度。
+
+### 事件搜索
+按关键词搜索历史事件，快速定位特定情节。
+
+### 角色关系
+查看所有NPC之间的关系网络和互动统计。
+
 ## 使用场景
 
 **写小说卡文？**
@@ -105,6 +114,26 @@ curl -X POST http://localhost:8000/api/novel/export \
 # 重置世界（重新运行）
 curl -X POST http://localhost:8000/api/worlds/{world_id}/reset \
   -H "Content-Type: application/json"
+
+# 暂停/恢复模拟
+curl -X POST http://localhost:8000/api/simulate/pause \
+  -H "Content-Type: application/json" \
+  -d '{"world_id":"{world_id}"}'
+
+curl -X POST http://localhost:8000/api/simulate/resume \
+  -H "Content-Type: application/json" \
+  -d '{"world_id":"{world_id}"}'
+
+# 单步执行
+curl -X POST http://localhost:8000/api/simulate/step \
+  -H "Content-Type: application/json" \
+  -d '{"world_id":"{world_id}","turns":5}'
+
+# 查看角色关系
+curl http://localhost:8000/api/worlds/{world_id}/relationships
+
+# 搜索事件
+curl "http://localhost:8000/api/worlds/{world_id}/events/search?q=关键词"
 ```
 
 ## 技术栈
