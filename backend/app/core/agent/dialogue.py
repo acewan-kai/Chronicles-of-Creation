@@ -334,7 +334,7 @@ class DialogueManager:
             DialogueIntent.NEGOTIATION: "谈判进行中",
             DialogueIntent.BETRAYAL: "存在背叛行为",
             DialogueIntent.TRUTH_REVEAL: "真相被揭露",
-            DialogueIntent.THREATEN: "存在威胁行为",
+            DialogueIntent.INTIMIDATION: "存在威胁行为",
             DialogueIntent.FAREWELL: "对话结束",
             DialogueIntent.CHALLENGE: "双方对峙",
             DialogueIntent.CASUAL: "普通对话",
