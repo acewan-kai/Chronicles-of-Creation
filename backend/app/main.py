@@ -29,6 +29,7 @@ from app.core.knowledge.budget_manager import BudgetManager
 from app.core.agent.agent import Agent, AgentConfig, MemoryStream
 from app.core.agent.planner import Planner
 from app.core.agent.reflector import Reflector
+from app.core.agent.dialogue import DialogueManager, DialogueIntent
 from app.core.ws_manager import ws_manager
 from app.core.scoring.scorer import AestheticScorer
 from app.core.scoring.behavior_evaluator import BehaviorEvaluator, EvalTracker
@@ -129,6 +130,7 @@ class SimulationContext:
         self.budget_manager: Optional[BudgetManager] = None
         self.eval_tracker: Optional[EvalTracker] = None
         self.behavior_evaluator: Optional[BehaviorEvaluator] = None
+        self.dialogue_manager: Optional[DialogueManager] = None
         self._sim_task: Optional[asyncio.Task] = None
         self._running: bool = False
 
@@ -448,6 +450,7 @@ async def _init_world_simulation(world_id: str, template_id: str, world_name: st
     ctx.budget_manager = BudgetManager(total_chars_per_turn=2000)
     ctx.behavior_evaluator = BehaviorEvaluator()
     ctx.eval_tracker = EvalTracker()
+    ctx.dialogue_manager = DialogueManager()
 
     # 世界状态
     template = TEMPLATE_WORLDS.get(template_id, TEMPLATE_WORLDS["cultivation"])
@@ -1195,6 +1198,82 @@ async def rewrite_story(req: StoryRewriteRequest):
     rewrite_text = await sifter.rewrite_slice(slice_obj, events, llm_client=llm_client)
 
     return {"rewrite": rewrite_text}
+
+
+# ═══════════════════════════════════════════════════════════
+# Dialogue API — C03 智能体对话系统
+# ═══════════════════════════════════════════════════════════
+
+class DialogueRequest(BaseModel):
+    world_id: str
+    speaker_a_id: str = Field(..., description="发言方A的agent_id")
+    speaker_b_id: str = Field(..., description="发言方B的agent_id")
+    topic: str = Field(..., description="对话主题")
+    max_turns: int = Field(8, description="最大对话轮数")
+
+
+@app.post("/api/dialogue/generate", tags=["智能体对话"], summary="生成NPC对话", description="生成两个NPC之间的自然语言对话，写入双方记忆流。")
+async def generate_dialogue(req: DialogueRequest):
+    """C03 智能体对话生成API"""
+    ctx = simulations.get(req.world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    # 获取Agent
+    agent_a = ctx.agents.get(req.speaker_a_id)
+    agent_b = ctx.agents.get(req.speaker_b_id)
+
+    if not agent_a or not agent_b:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # 获取上下文
+    context = ctx.world_state.to_context() if ctx.world_state else ""
+
+    # 生成对话
+    llm_client = ctx.executor.llm_client if ctx.executor else None
+
+    if not llm_client:
+        return {"dialogue": None, "message": "No LLM client available, use mock mode"}
+
+    dialogue = await ctx.dialogue_manager.generate_dialogue(
+        speaker_a=agent_a,
+        speaker_b=agent_b,
+        topic=req.topic,
+        context=context,
+        llm_client=llm_client,
+        max_turns=req.max_turns,
+    )
+
+    # 写入记忆流
+    current_turn = ctx.world_state.current_turn if ctx.world_state else 0
+    ctx.dialogue_manager.write_to_memory(
+        dialogue, agent_a, agent_b, current_turn
+    )
+
+    return {"dialogue": ctx.dialogue_manager.to_dict(dialogue)}
+
+
+class DialogueHistoryRequest(BaseModel):
+    world_id: str
+    agent_a_id: str
+    agent_b_id: str
+
+
+@app.post("/api/dialogue/history", tags=["智能体对话"], summary="获取对话历史", description="获取两个NPC之间的历史对话记录。")
+async def get_dialogue_history(req: DialogueHistoryRequest):
+    """获取对话历史"""
+    ctx = simulations.get(req.world_id)
+    if not ctx or not ctx.dialogue_manager:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    dialogue = ctx.dialogue_manager.get_dialogue_history(
+        req.agent_a_id, req.agent_b_id
+    )
+
+    if not dialogue:
+        return {"dialogue": None, "message": "No dialogue history found"}
+
+    return {"dialogue": ctx.dialogue_manager.to_dict(dialogue)}
 
 
 # ═══════════════════════════════════════════════════════════
