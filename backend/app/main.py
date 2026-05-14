@@ -1432,6 +1432,27 @@ async def simulate_stop(req: dict):
     return {"status": "stopped", "world_id": world_id}
 
 
+@app.post("/api/worlds/{world_id}/reset", tags=["世界管理"], summary="重置世界", description="停止模拟并重置世界到初始状态（保留配置但清空事件和记忆）。用于重新运行同一世界设定。")
+async def reset_world(world_id: str):
+    """重置世界"""
+    if world_id not in worlds_db:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    ctx = simulations.get(world_id)
+    if ctx:
+        ctx.stop()
+        simulations.pop(world_id, None)
+
+    # 清空事件存储
+    if ctx and ctx.event_store:
+        await ctx.event_store.clear()
+
+    # 重置状态
+    worlds_db[world_id]["status"] = "created"
+
+    return {"status": "reset", "world_id": world_id}
+
+
 @app.get("/api/simulate/status", tags=["模拟控制"], summary="查看模拟状态", description="查询指定世界的模拟运行状态。参数：world_id(必填)。返回：is_running(是否运行中)、turn(当前回合数)、event_count(事件数量)。**测试第五步**：观察回合数是否在增长。")
 async def simulate_status(world_id: str = ""):
     """获取模拟状态"""
