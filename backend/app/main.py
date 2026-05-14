@@ -1092,6 +1092,29 @@ async def get_world_behavior(world_id: str):
     return {"behavior": ctx.eval_tracker.get_summary()}
 
 
+@app.get("/api/worlds/{world_id}/relationships", tags=["世界管理"], summary="角色关系统计", description="获取世界上所有角色之间的关系网络和互动统计。")
+async def get_world_relationships(world_id: str):
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.knowledge_graph:
+        return {"relationships": [], "stats": {}}
+
+    edges = ctx.knowledge_graph.get_edges_for_api()
+
+    # 统计关系类型
+    rel_types = {}
+    for edge in edges:
+        rel_type = edge.get("type", "unknown")
+        rel_types[rel_type] = rel_types.get(rel_type, 0) + 1
+
+    return {
+        "relationships": edges,
+        "stats": {
+            "total": len(edges),
+            "by_type": rel_types
+        }
+    }
+
+
 @app.get("/api/worlds/{world_id}/budget", tags=["世界管理"], summary="Lorebook预算使用", description="获取World Info注入预算的分配与使用统计，按角色优先级排序。")
 async def get_world_budget(world_id: str):
     ctx = simulations.get(world_id)
