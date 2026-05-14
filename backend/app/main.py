@@ -33,6 +33,7 @@ from app.core.ws_manager import ws_manager
 from app.core.scoring.scorer import AestheticScorer
 from app.core.scoring.behavior_evaluator import BehaviorEvaluator, EvalTracker
 from app.core.sandbox.narrative_extractor import NarrativeExtractor
+from app.core.sandbox.story_sifter import StorySifter
 from app.core.usage_tracker import UsageTracker
 from app.core.onboarding import OnboardingGuide
 
@@ -1120,6 +1121,94 @@ async def preview_narrative(world_id: str, min_turn: int = 1, max_turn: int = 20
     chapter = await extractor.extract(events, llm_client=None)
 
     return {"preview": extractor.to_dict(chapter)}
+
+
+# ═══════════════════════════════════════════════════════════
+# Story Sifting API — E01-E03 故事淘洗引擎
+# ═══════════════════════════════════════════════════════════
+
+class StorySiftRequest(BaseModel):
+    world_id: str
+    min_turn: Optional[int] = Field(1, description="起始回合")
+    max_turn: Optional[int] = Field(None, description="结束回合")
+    min_quality: float = Field(0.3, description="最低质量阈值(0-1)")
+    max_slices: int = Field(10, description="最多返回切片数")
+
+
+@app.post("/api/story/sift", tags=["故事淘洗"], summary="筛选叙事切片", description="从指定回合范围内的事件中筛选高价值叙事切片，按三维度（意外性/逻辑性/情感）评分排序。")
+async def sift_story(req: StorySiftRequest):
+    """E02 叙事切片发现API"""
+    ctx = simulations.get(req.world_id)
+    if not ctx or not ctx.query_engine:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    # 查询事件
+    if req.max_turn:
+        events = await ctx.query_engine.get_events_by_turns(req.min_turn, req.max_turn)
+    else:
+        events = await ctx.query_engine.store.query(
+            turn_range=(req.min_turn, 9999),
+            limit=500
+        )
+
+    if not events:
+        return {"slices": [], "message": "No events found"}
+
+    # 使用故事淘洗引擎
+    sifter = StorySifter()
+    result = await sifter.sift(events, min_quality=req.min_quality, max_slices=req.max_slices)
+
+    return sifter.to_api_response(result)
+
+
+class StoryRewriteRequest(BaseModel):
+    world_id: str
+    slice_id: str
+    start_turn: int
+    end_turn: int
+
+
+@app.post("/api/story/rewrite", tags=["故事淘洗"], summary="重写叙事切片", description="将指定叙事切片重写为可读的章节文本（调用LLM）。")
+async def rewrite_story(req: StoryRewriteRequest):
+    """E03 LLM文本化重写API"""
+    ctx = simulations.get(req.world_id)
+    if not ctx or not ctx.query_engine:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    # 获取切片内事件
+    events = await ctx.query_engine.get_events_by_turns(req.start_turn, req.end_turn)
+    if not events:
+        return {"rewrite": None, "message": "No events found in slice"}
+
+    # 构造切片对象
+    actors = set()
+    for e in events:
+        if hasattr(e, 'actor_name') and e.actor_name:
+            actors.add(e.actor_name)
+        if hasattr(e, 'target_name') and e.target_name:
+            actors.add(e.target_name)
+
+    from app.core.sandbox.story_sifter import NarrativeSlice, SliceScores, SliceQuality
+    slice_obj = NarrativeSlice(
+        slice_id=req.slice_id,
+        start_turn=req.start_turn,
+        end_turn=req.end_turn,
+        event_count=len(events),
+        core_actors=list(actors)[:5],
+        core_action=events[0].action if hasattr(events[0], 'action') else "事件",
+        setup="",
+        development="",
+        climax="",
+        quality=SliceQuality.GOOD,
+        scores=SliceScores(),
+    )
+
+    # 使用故事淘洗引擎重写
+    sifter = StorySifter()
+    llm_client = ctx.executor.llm_client if ctx.executor else None
+    rewrite_text = await sifter.rewrite_slice(slice_obj, events, llm_client=llm_client)
+
+    return {"rewrite": rewrite_text}
 
 
 # ═══════════════════════════════════════════════════════════

@@ -2,7 +2,7 @@
 task: "P1-A05 叙事提取引擎开发"
 slug: "20260514-153000_p1-narrative-extraction"
 effort: "deep"
-phase: "plan"
+phase: "complete"
 progress: "10/12"
 mode: "ALGORITHM"
 started: "2026-05-14T15:30:00"
