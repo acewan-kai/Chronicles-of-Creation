@@ -32,8 +32,11 @@ from app.core.scoring.scorer import AestheticScorer
 from app.core.usage_tracker import UsageTracker
 from app.core.onboarding import OnboardingGuide
 
-# 加载环境变量
-load_dotenv()
+# 加载项目根目录 .env（兼容本地/服务器两种路径层级）
+_env_path = Path(__file__).resolve().parent.parent / '.env'   # 服务器: ~/p0-mvp-backend/.env
+if not _env_path.exists():
+    _env_path = Path(__file__).resolve().parent.parent.parent / '.env'  # 本地: project/.env
+load_dotenv(_env_path)
 
 # ── API标签元数据 ────────────────────────────────────────
 tags_metadata = [

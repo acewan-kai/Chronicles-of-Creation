@@ -1,17 +1,19 @@
 # 项目进度文档
 
-> 最后更新: 2026-05-14 12:00 (目录结构重构完成 + 部署脚本更新)
+> 最后更新: 2026-05-14 12:30 (统一.env环境变量文件——LLM Key+部署密码集中管理)
 
 ## 快速恢复指南（下次开工读这里）
 
 ```
+环境配置: 复制 .env.example → .env 填入真实Key/密码 (已忽略提交)
 服务器: ssh -i C:/Users/18380/.ssh/claw.pem ubuntu@170.106.194.111
 后端重启: ssh -i C:/Users/18380/.ssh/claw.pem ubuntu@170.106.194.111 "cd ~/p0-mvp-backend && nohup ~/p0-mvp-venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &"
 前端部署: cd frontend && npx vite build && scp -i C:/Users/18380/.ssh/claw.pem -r dist/* ubuntu@170.106.194.111:~/p0-mvp-frontend/
+部署脚本: tools/deploy.bat (自动上传代码+构建+启动)
 代码已提交: ✅ git commit完成 (2026-05-14)
 当前状态: P0 MVP部署验收完成，Sprint 1 90% + Sprint 2 95% + Sprint 3 75%
 下一优先: S2-6 World Info预算管理 + S2-7 行为一致性评测 + S3-5 WebSocket实时推送
-项目结构: 标准布局 (backend/ + frontend/ + tools/ + docs/ + archive/)
+项目结构: 标准布局 (backend/ + frontend/ + tools/ + docs/ + archive/ + .env)
 ```
 
 ---

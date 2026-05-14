@@ -11,7 +11,6 @@ venv/
 
 # Local tools (not for version control)
 tools/*
-!tools/.env.deploy.example
 claw.pem
 
 # OS
@@ -30,9 +29,9 @@ build/
 .claude/
 .codebuddy/
 
-# Environment files (credentials — .env.deploy.example is the only exception)
+# Environment files (credentials — 仅 .env.example 可提交)
 .env*
-!.env.deploy.example
+!.env.example
 
 # Local runtime data
 backend/data/
