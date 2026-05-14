@@ -136,6 +136,56 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({ metrics }) => {
           )}
         </div>
       )}
+
+      {metrics.behavior && metrics.behavior.total_evaluations > 0 && (
+        <div className="budget-panel">
+          <h4>行为一致性</h4>
+          <div className="budget-bar-wrapper">
+            <div className="budget-bar-label">
+              综合 {metrics.behavior.avg_score?.toFixed(2)}
+            </div>
+            <div className="budget-bar">
+              <div
+                className="budget-bar-fill"
+                style={{ width: `${(metrics.behavior.avg_score || 0) * 100}%` }}
+              />
+            </div>
+            <div className="budget-bar-pct">
+              评测{metrics.behavior.total_evaluations}次
+            </div>
+          </div>
+          <div className="behavior-breakdown">
+            <span className="behavior-tag consistent">
+              一致 {metrics.behavior.consistent_pct}%
+            </span>
+            <span className="behavior-tag divergent">
+              偏离 {metrics.behavior.divergent_pct}%
+            </span>
+          </div>
+          {metrics.behavior.agents && (
+            <ul className="budget-agent-list">
+              {metrics.behavior.agents
+                .sort((a: any, b: any) => b.avg_score - a.avg_score)
+                .slice(0, 5)
+                .map((a: any) => (
+                  <li key={a.agent_id} className="budget-agent-item">
+                    <span className="budget-agent-name">{a.agent_id}</span>
+                    <span className="budget-agent-bar">
+                      <span
+                        className="budget-agent-fill"
+                        style={{ width: `${a.avg_score * 100}%` }}
+                      />
+                    </span>
+                    <span className="budget-agent-pct">
+                      {a.avg_score?.toFixed(2)}
+                      {a.recent_trend === 'up' ? ' ↑' : a.recent_trend === 'down' ? ' ↓' : ''}
+                    </span>
+                  </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 };

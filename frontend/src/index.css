@@ -1266,3 +1266,27 @@ body {
   text-align: right;
   color: var(--text-secondary);
 }
+
+/* ── Behavior Evaluation (S2-7 行为一致性评测) ────────── */
+.behavior-breakdown {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.72rem;
+}
+
+.behavior-tag {
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.behavior-tag.consistent {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.behavior-tag.divergent {
+  background: #fce4ec;
+  color: #c62828;
+}

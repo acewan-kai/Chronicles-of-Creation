@@ -65,6 +65,7 @@ function App() {
             npc_count: msg.data.npc_count,
             world_mood: msg.data.world_mood,
             budget: msg.data.budget,
+            behavior: msg.data.behavior,
           });
           setWorldData((prev: World | null) => ({
             ...prev,

@@ -31,6 +31,7 @@ from app.core.agent.planner import Planner
 from app.core.agent.reflector import Reflector
 from app.core.ws_manager import ws_manager
 from app.core.scoring.scorer import AestheticScorer
+from app.core.scoring.behavior_evaluator import BehaviorEvaluator, EvalTracker
 from app.core.usage_tracker import UsageTracker
 from app.core.onboarding import OnboardingGuide
 
@@ -123,6 +124,8 @@ class SimulationContext:
         self.knowledge_graph: Optional[KnowledgeGraph] = None
         self.lorebook: Optional[Lorebook] = None
         self.budget_manager: Optional[BudgetManager] = None
+        self.eval_tracker: Optional[EvalTracker] = None
+        self.behavior_evaluator: Optional[BehaviorEvaluator] = None
         self._sim_task: Optional[asyncio.Task] = None
         self._running: bool = False
 
@@ -455,6 +458,8 @@ async def _init_world_simulation(world_id: str, template_id: str, world_name: st
     ctx.knowledge_graph = KnowledgeGraph()
     ctx.lorebook = Lorebook()
     ctx.budget_manager = BudgetManager(total_chars_per_turn=2000)
+    ctx.behavior_evaluator = BehaviorEvaluator()
+    ctx.eval_tracker = EvalTracker()
 
     # 世界状态
     template = TEMPLATE_WORLDS.get(template_id, TEMPLATE_WORLDS["cultivation"])
@@ -752,6 +757,28 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                         if target_id in ctx.agents:
                             recent_targets.add(target_id)
 
+                    # 行为一致性评测
+                    if ctx.behavior_evaluator:
+                        target_rel = None
+                        if result.target:
+                            tgt_id = name_to_id.get(result.target, result.target)
+                            edge_data = ctx.knowledge_graph.graph.get_edge_data(result.actor_id, tgt_id)
+                            if edge_data:
+                                rel_type = list(edge_data.values())[0].get("type", "")
+                                target_rel = rel_type
+                        report = ctx.behavior_evaluator.evaluate(
+                            agent_id=agent.agent_id,
+                            agent_name=agent.config.name,
+                            identity=agent.config.identity,
+                            personality=agent.config.personality,
+                            goals=agent.config.goals,
+                            action=result.action,
+                            target=result.target,
+                            relation_type=target_rel,
+                            turn=turn,
+                        )
+                        ctx.eval_tracker.record(report)
+
                     return result
                 return task
 
@@ -818,6 +845,7 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                 "npc_count": metrics.npc_count,
                 "graph_edges": ctx.knowledge_graph.get_edges_for_api(),
                 "budget": ctx.budget_manager.get_stats(),
+                "behavior": ctx.eval_tracker.get_summary() if ctx.eval_tracker else {},
             })
 
     finally:
@@ -953,6 +981,14 @@ def _event_to_dict(e) -> dict:
         "timestamp": e.timestamp,
         "world_mood": e.world_mood
     }
+
+
+@app.get("/api/worlds/{world_id}/behavior", tags=["世界管理"], summary="行为一致性评测", description="获取NPC行为与角色设定的一致性评分：身份/性格/目标/关系四维度+总体趋势。")
+async def get_world_behavior(world_id: str):
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.eval_tracker:
+        return {"behavior": None, "message": "Behavior evaluator not initialized"}
+    return {"behavior": ctx.eval_tracker.get_summary()}
 
 
 @app.get("/api/worlds/{world_id}/budget", tags=["世界管理"], summary="Lorebook预算使用", description="获取World Info注入预算的分配与使用统计，按角色优先级排序。")
