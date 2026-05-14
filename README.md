@@ -28,6 +28,15 @@
 ### 故事淘洗
 从海量事件中找出最有价值的叙事切片，按「意外性」「逻辑性」「情感强度」排序。
 
+### NPC对话生成
+让任意两个AI角色围绕特定话题展开对话，生成自然语言交互，写入双方记忆流。
+
+### 小说导出
+将模拟产生的事件和对话，导出为带章节结构的Markdown小说文本。
+
+### 角色自定义
+创建世界后，可修改任意NPC的名称、身份、性格，使其更符合你的创作需求。
+
 ## 使用场景
 
 **写小说卡文？**
@@ -79,6 +88,16 @@ curl http://localhost:8000/api/worlds/{world_id}/events?limit=10
 curl -X POST http://localhost:8000/api/dialogue/generate \
   -H "Content-Type: application/json" \
   -d '{"world_id":"{world_id}","speaker_a_id":"boss_shen","speaker_b_id":"partner_bai","topic":"案件讨论"}'
+
+# 自定义角色
+curl -X PATCH http://localhost:8000/api/worlds/{world_id}/agents/boss_shen \
+  -H "Content-Type: application/json" \
+  -d '{"name":"沈夜所长","personality":"更加沉稳老练"}'
+
+# 导出小说
+curl -X POST http://localhost:8000/api/novel/export \
+  -H "Content-Type: application/json" \
+  -d '{"world_id":"{world_id}","start_turn":1,"end_turn":20,"format":"markdown"}'
 ```
 
 ## 技术栈
