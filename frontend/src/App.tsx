@@ -5,7 +5,7 @@ import { AgentList } from './components/AgentList';
 import { MetricsPanel } from './components/MetricsPanel';
 import { OnboardingGuide } from './components/OnboardingGuide';
 import { CreateWorldModal } from './components/CreateWorldModal';
-import { api, World, Event, Agent, Location } from './api';
+import { api, connectWebSocket, World, Event, Agent, Location, WsMessage } from './api';
 
 function App() {
   const [worldId, setWorldId] = useState<string>('');
@@ -25,21 +25,70 @@ function App() {
     loadWorlds();
   }, []);
 
-  // 加载数据
+  // 加载初始数据（非模拟时）
   useEffect(() => {
-    if (worldId) {
+    if (worldId && !isSimulating) {
       loadData();
     }
-    
-    // 轮询更新
-    const interval = setInterval(() => {
-      if (isSimulating && worldId) {
-        loadData();
+  }, [worldId]);
+
+  // WebSocket 实时连接（模拟运行时）
+  useEffect(() => {
+    if (!isSimulating || !worldId) return;
+
+    let wsRef: WebSocket | null = null;
+    let eventSeq = 0;
+
+    const onMessage = (msg: WsMessage) => {
+      switch (msg.type) {
+        case 'NEW_EVENT': {
+          const ev: Event = {
+            id: ++eventSeq,
+            turn: msg.data.turn,
+            actor: msg.data.actor,
+            action: msg.data.action,
+            target: msg.data.target,
+            location: msg.data.location,
+            action_type: msg.data.action_type,
+            score: msg.data.score,
+            world_mood: msg.data.world_mood,
+            timestamp: new Date().toISOString(),
+          };
+          setEvents((prev: Event[]) => [...prev.slice(-299), ev]);
+          break;
+        }
+        case 'TURN_COMPLETE': {
+          setMetrics({
+            current_turn: msg.data.turn,
+            total_events: msg.data.event_count,
+            success_count: msg.data.success_count,
+            npc_count: msg.data.npc_count,
+            world_mood: msg.data.world_mood,
+          });
+          setWorldData((prev: World | null) => ({
+            ...prev,
+            agents: msg.data.agents,
+            graph_edges: msg.data.graph_edges,
+          }));
+          break;
+        }
+        case 'STATUS_CHANGE': {
+          if (msg.data.status === 'stopped') {
+            setIsSimulating(false);
+          }
+          break;
+        }
       }
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [worldId, isSimulating]);
+    };
+
+    wsRef = connectWebSocket(worldId, onMessage);
+
+    return () => {
+      if (wsRef && wsRef.readyState === WebSocket.OPEN) {
+        wsRef.close();
+      }
+    };
+  }, [isSimulating, worldId]);
 
   const loadWorlds = async () => {
     try {

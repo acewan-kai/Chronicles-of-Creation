@@ -2,7 +2,7 @@
 P0 MVP - FastAPI 主入口 (集成core模块)
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -28,6 +28,7 @@ from app.core.knowledge.knowledge_graph import KnowledgeGraph, KnowledgeNode, Kn
 from app.core.agent.agent import Agent, AgentConfig, MemoryStream
 from app.core.agent.planner import Planner
 from app.core.agent.reflector import Reflector
+from app.core.ws_manager import ws_manager
 from app.core.scoring.scorer import AestheticScorer
 from app.core.usage_tracker import UsageTracker
 from app.core.onboarding import OnboardingGuide
@@ -697,6 +698,20 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                     )
                     await ctx.event_store.save(event)
 
+                    # WebSocket: 推送新事件
+                    await ws_manager.broadcast(ctx.world_id, "NEW_EVENT", {
+                        "turn": turn,
+                        "day": ctx.world_state.current_day,
+                        "time_of_day": ctx.world_state.time_of_day,
+                        "actor": result.actor_name,
+                        "action": result.action,
+                        "target": result.target,
+                        "action_type": result.action_type,
+                        "location": result.location,
+                        "score": score_result.total_score,
+                        "world_mood": ctx.world_state.world_mood,
+                    })
+
                     # 动态更新知识图谱关系边
                     if result.target:
                         target_id = name_to_id.get(result.target, result.target)
@@ -765,8 +780,26 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                         if reflection:
                             agent.reflect_simple(reflection.summary, turn)
 
+            # WebSocket: 每回合结束推送状态快照
+            await ws_manager.broadcast(ctx.world_id, "TURN_COMPLETE", {
+                "turn": turn,
+                "day": ctx.world_state.current_day,
+                "time_of_day": ctx.world_state.time_of_day,
+                "world_mood": ctx.world_state.world_mood,
+                "agents": [a.to_dict() for a in ctx.agents.values()],
+                "event_count": metrics.total_events,
+                "success_count": metrics.success_count,
+                "npc_count": metrics.npc_count,
+                "graph_edges": ctx.knowledge_graph.get_edges_for_api(),
+            })
+
     finally:
         ctx._running = False
+        # WebSocket: 推送模拟终止
+        await ws_manager.broadcast(ctx.world_id, "STATUS_CHANGE", {
+            "status": "stopped",
+            "turn": ctx.world_state.current_turn if ctx.world_state else 0,
+        })
 
 
 @app.get("/api/worlds", tags=["世界管理"], summary="获取世界列表", description="返回所有已创建的世界。**测试第三步前置**：确认已创建的世界及其ID。")
@@ -938,6 +971,23 @@ async def get_world_metrics(world_id: str):
 
 
 @app.post("/api/worlds/{world_id}/start", tags=["模拟控制"], summary="启动模拟(旧路径)", description="旧版启动端点。推荐使用 POST /simulate/start 传入 {\"world_id\": \"xxx\"} 格式。")
+# ═══════════════════════════════════════════════════════════
+# WebSocket 实时推送
+# ═══════════════════════════════════════════════════════════
+
+@app.websocket("/ws/{world_id}")
+async def websocket_endpoint(ws: WebSocket, world_id: str):
+    await ws_manager.connect(world_id, ws)
+    try:
+        while True:
+            # 保持连接，等待客户端消息（心跳 / 断开）
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        await ws_manager.disconnect(world_id, ws)
+    except Exception:
+        await ws_manager.disconnect(world_id, ws)
+
+
 async def start_simulation(world_id: str):
     if world_id not in worlds_db:
         raise HTTPException(status_code=404, detail="World not found")

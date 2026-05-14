@@ -1,9 +1,14 @@
 import axios from 'axios';
 
 // API配置 - 开发环境使用代理，生产环境使用实际地址
-const API_BASE = import.meta.env.PROD 
-  ? 'http://170.106.194.111:8000' 
+const API_BASE = import.meta.env.PROD
+  ? 'http://170.106.194.111:8000'
   : '/api';
+
+// WebSocket URL - 开发用Vite代理，生产直连
+const WS_BASE = import.meta.env.PROD
+  ? 'ws://170.106.194.111:8000'
+  : `ws://${window.location.host}`;
 
 // API响应类型
 export interface Agent {
@@ -109,6 +114,42 @@ export interface SimulationStatus {
 export interface HealthCheck {
   status: string;
   version: string;
+}
+
+// WebSocket 消息类型
+export interface WsMessage {
+  type: 'NEW_EVENT' | 'TURN_COMPLETE' | 'STATUS_CHANGE';
+  data: any;
+}
+
+export type WsHandler = (msg: WsMessage) => void;
+
+// WebSocket 连接工厂
+export function connectWebSocket(worldId: string, onMessage: WsHandler): WebSocket {
+  const ws = new WebSocket(`${WS_BASE}/ws/${worldId}`);
+
+  ws.onopen = () => {
+    console.log(`[WS] 已连接到世界 ${worldId}`);
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const msg: WsMessage = JSON.parse(event.data);
+      onMessage(msg);
+    } catch {
+      console.warn('[WS] 无法解析消息:', event.data);
+    }
+  };
+
+  ws.onerror = (err) => {
+    console.error('[WS] 连接错误:', err);
+  };
+
+  ws.onclose = (e) => {
+    console.log(`[WS] 连接关闭 (code=${e.code})`);
+  };
+
+  return ws;
 }
 
 export const api = {

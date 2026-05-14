@@ -36,6 +36,11 @@ export default defineConfig({
       '/health': {
         target: API_BASE,
         changeOrigin: true
+      },
+      '/ws': {
+        target: API_BASE.replace('http', 'ws'),
+        ws: true,
+        changeOrigin: true
       }
     }
   }
