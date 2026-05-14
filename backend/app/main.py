@@ -983,6 +983,30 @@ async def update_agent(world_id: str, agent_id: str, req: dict):
     return {"agent": agent.to_dict()}
 
 
+@app.get("/api/worlds/{world_id}/events/search", tags=["世界管理"], summary="搜索事件内容", description="根据关键词搜索事件内容。支持正则表达式。")
+async def search_events(
+    world_id: str,
+    q: str = "",
+    limit: int = 50,
+):
+    """搜索事件内容"""
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.query_engine:
+        return {"events": [], "total": 0}
+
+    events = await ctx.query_engine.store.query(limit=500)
+    import re
+    pattern = re.compile(q, re.IGNORECASE) if q else None
+    filtered = [e for e in events if not pattern or pattern.search(e.action or "")]
+    filtered = filtered[:limit]
+
+    return {
+        "events": [_event_to_dict(e) for e in filtered],
+        "total": len(filtered),
+        "query": q
+    }
+
+
 @app.get("/api/worlds/{world_id}/events", tags=["世界管理"], summary="查询世界事件", description="获取AI角色在模拟中生成的事件日志。支持多种筛选：by_turn(按回合)、by_actor(按角色名)、by_type(按类型normal/interaction/story_moment)、by_location(按地点)、min_turn+max_turn(回合范围)。**测试第六步**：查看AI角色的行为和互动。")
 async def get_world_events(
     world_id: str,
