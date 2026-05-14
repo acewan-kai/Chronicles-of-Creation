@@ -10,7 +10,8 @@ venv/
 .venv/
 
 # Local tools (not for version control)
-tools/
+tools/*
+!tools/.env.deploy.example
 claw.pem
 
 # OS
@@ -29,10 +30,9 @@ build/
 .claude/
 .codebuddy/
 
-# Deployment scripts (may contain secrets)
-tools/deploy.*
-tools/deploy.exp
-tools/install.sh
+# Environment files (credentials — .env.deploy.example is the only exception)
+.env*
+!.env.deploy.example
 
 # Local runtime data
 backend/data/
