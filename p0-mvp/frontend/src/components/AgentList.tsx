@@ -23,10 +23,16 @@ export const AgentList: React.FC<AgentListProps> = ({ agents, events }) => {
                 </div>
               </div>
               {agent.planner?.current_plan && (
-                <div className="agent-plan" title={agent.planner.current_plan.steps.map(s => s.description).join(' → ')}>
+                <div className="agent-plan" title={agent.planner.current_plan.steps.map((s: any) => s.description).join(' → ')}>
                   <span className="plan-icon">🎯</span>
                   <span className="plan-title">{agent.planner.current_plan.title}</span>
                   <span className="plan-progress">{Math.round(agent.planner.current_plan.progress_pct * 100)}%</span>
+                </div>
+              )}
+              {agent.reflector?.latest_summary && (
+                <div className="agent-reflection" title={agent.reflector.latest_summary}>
+                  <span className="reflection-icon">💭</span>
+                  <span className="reflection-text">{agent.reflector.latest_summary.slice(0, 60)}{agent.reflector.latest_summary.length > 60 ? '...' : ''}</span>
                 </div>
               )}
               <div className="agent-stats">

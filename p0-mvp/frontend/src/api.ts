@@ -43,6 +43,12 @@ export interface Agent {
       created_turn: number;
     } | null;
   };
+  reflector?: {
+    reflection_count: number;
+    last_reflection_turn: number;
+    recent_insights: string[];
+    latest_summary: string | null;
+  };
 }
 
 export interface Location {

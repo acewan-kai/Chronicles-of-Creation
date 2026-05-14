@@ -503,9 +503,10 @@ async def _init_world_simulation(world_id: str, template_id: str, world_name: st
         ctx.world_state.move_npc(agent.agent_id, loc_id)
         agent.update_location(loc_id)
 
-    # 为每个Agent创建Planner并生成初始计划
+    # 为每个Agent创建Planner和Reflector
     for agent in ctx.agents.values():
         agent.planner = Planner(agent.agent_id, planning_interval=10)
+        agent.reflector = Reflector(agent.agent_id, reflection_interval=20)
         # 生成初始计划（Mock模式用角色化plan，LLM模式用LLM生成）
         situation = ctx.world_state.to_context()
         plan = await agent.planner.generate_plan(
@@ -542,8 +543,63 @@ async def _init_world_simulation(world_id: str, template_id: str, world_name: st
     for event_desc in template.get("active_events", []):
         ctx.world_state.active_events.append(event_desc)
 
+    # 从模板加载Lorebook词条
+    _load_lorebook_from_template(ctx, template)
+
     simulations[world_id] = ctx
     return ctx
+
+
+def _load_lorebook_from_template(ctx: SimulationContext, template: dict):
+    """从世界模板加载Lorebook词条"""
+    # 地点词条
+    for loc in template.get("world", {}).get("locations", []):
+        ctx.lorebook.add_entry(LoreEntry(
+            key=loc["name"],
+            content=loc.get("description", ""),
+            aliases=[loc["id"]],
+            priority=2,
+        ))
+
+    # 势力词条
+    for faction in template.get("world", {}).get("factions", []):
+        ctx.lorebook.add_entry(LoreEntry(
+            key=faction["name"],
+            content=faction.get("description", ""),
+            aliases=[faction["id"]],
+            priority=3,
+        ))
+
+    # 世界规则
+    for rule in template.get("world", {}).get("rules", []):
+        ctx.lorebook.add_entry(LoreEntry(
+            key=rule["name"],
+            content=rule.get("description", ""),
+            aliases=[rule["id"]],
+            priority=1,
+        ))
+
+    # NPC背景（取前80字作为关键信息）
+    for npc in template.get("npcs", []):
+        bg = npc.get("background", "").strip()
+        if bg:
+            lines = bg.split("\n")
+            short_bg = lines[0][:120] if lines else bg[:120]
+            ctx.lorebook.add_entry(LoreEntry(
+                key=npc["name"],
+                content=f"{npc.get('role', '')} — {short_bg}",
+                aliases=[npc["id"]],
+                priority=2,
+            ))
+
+    # 世界事件
+    for evt in template.get("world_events", []):
+        ctx.lorebook.add_entry(LoreEntry(
+            key=evt["name"],
+            content=evt.get("description", ""),
+            aliases=[evt["id"]],
+            priority=4,
+        ))
 
 
 def _update_world_mood(ctx: SimulationContext, metrics):
@@ -589,6 +645,14 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                 async def task():
                     situation = ctx.world_state.to_context()
                     system_prompt = agent.think(situation)
+
+                    # Lorebook上下文注入
+                    lore_context = ctx.lorebook.inject_context(
+                        system_prompt, max_chars=600
+                    )
+                    if lore_context != system_prompt:
+                        system_prompt = lore_context
+
                     user_prompt = f"当前时间：第{ctx.world_state.current_day}天 {ctx.world_state.time_of_day}\n你所在的{agent.current_location}，请决定你的下一步动作。"
 
                     result = await ctx.executor.execute(
@@ -682,14 +746,21 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                                 f"制定新计划: {plan.title}", turn
                             )
 
-            # 周期性反思
+            # 周期性反思 (使用agent上已有的reflector，传入LLM)
             if turn % 20 == 0:
                 for agent in ctx.agents.values():
-                    reflector = Reflector(agent.agent_id)
-                    if reflector.should_reflect(turn):
-                        reflection = reflector.reflect_simple(turn, agent.memory)
+                    if agent.reflector and agent.reflector.should_reflect(turn):
+                        situation = ctx.world_state.to_context()
+                        reflection = await agent.reflector.reflect(
+                            current_turn=turn,
+                            memory_stream=agent.memory,
+                            llm_client=ctx.executor.llm_client,
+                            identity=agent.config.identity,
+                            personality=agent.config.personality,
+                            situation=situation,
+                        )
                         if reflection:
-                            agent.reflect(reflection.summary, turn)
+                            agent.reflect_simple(reflection.summary, turn)
 
     finally:
         ctx._running = False

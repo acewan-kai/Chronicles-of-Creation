@@ -12,6 +12,7 @@ from enum import Enum
 
 if TYPE_CHECKING:
     from .planner import Planner
+    from .reflector import Reflector
 
 
 class MemoryType(Enum):
@@ -429,11 +430,13 @@ class Agent:
         config: AgentConfig,
         memory_stream: Optional[MemoryStream] = None,
         planner: Optional["Planner"] = None,
+        reflector: Optional["Reflector"] = None,
     ):
         self.agent_id = agent_id
         self.config = config
         self.memory = memory_stream or MemoryStream(agent_id)
-        self.planner = planner  # 规划器（首次计划在初始化后由main设置LLM后生成）
+        self.planner = planner
+        self.reflector = reflector
 
         # 当前状态
         self.current_location = "unknown"
@@ -488,8 +491,8 @@ class Agent:
         self.last_action = action
         self.survival_turns += 1
 
-    def reflect(self, reflection: str, turn: int):
-        """添加反思"""
+    def reflect_simple(self, reflection: str, turn: int):
+        """直接添加反思文本到记忆流"""
         self.memory.set_turn(turn)
         self.memory.add_reflection(reflection, turn, importance=0.8)
 
@@ -536,4 +539,5 @@ class Agent:
             "memory_count": len(self.memory.memories),
             "memory_stats": self.memory.get_stats(),
             "planner": self.planner.to_dict() if self.planner else None,
+            "reflector": self.reflector.to_dict() if self.reflector else None,
         }
