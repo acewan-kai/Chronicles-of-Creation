@@ -27,7 +27,7 @@
 ### 安装依赖
 
 ```bash
-cd p0-mvp/frontend
+cd frontend
 npm install
 ```
 

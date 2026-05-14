@@ -30,8 +30,9 @@ build/
 .codebuddy/
 
 # Deployment scripts (may contain secrets)
-p0-mvp/deploy.*
-p0-mvp/install.sh
+tools/deploy.*
+tools/deploy.exp
+tools/install.sh
 
 # Local runtime data
-p0-mvp/backend/data/
+backend/data/

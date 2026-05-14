@@ -3,7 +3,6 @@
 ## 项目结构
 
 ```
-p0-mvp/
 ├── backend/
 │   ├── app/
 │   │   ├── core/
@@ -15,10 +14,12 @@ p0-mvp/
 │   │   ├── api/             # FastAPI 路由
 │   │   └── main.py          # 主入口
 │   └── requirements.txt
-└── frontend/
-    ├── src/
-    │   └── components/      # F01 可视化图谱
-    └── package.json
+├── frontend/
+│   ├── src/
+│   │   └── components/      # F01 可视化图谱
+│   └── package.json
+├── tools/                   # 部署脚本
+└── archive/                 # 历史原型代码
 ```
 
 ## 开发进度

@@ -1,16 +1,17 @@
 # 项目进度文档
 
-> 最后更新: 2026-05-14 11:10 (Sprint 2收尾——Reflector LLM化+Lorebook注入+EventTimeline筛选)
+> 最后更新: 2026-05-14 12:00 (目录结构重构完成 + 部署脚本更新)
 
 ## 快速恢复指南（下次开工读这里）
 
 ```
 服务器: ssh -i C:/Users/18380/.ssh/claw.pem ubuntu@170.106.194.111
 后端重启: ssh -i C:/Users/18380/.ssh/claw.pem ubuntu@170.106.194.111 "cd ~/p0-mvp-backend && nohup ~/p0-mvp-venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &"
-前端部署: cd p0-mvp/frontend && npx vite build && scp -i C:/Users/18380/.ssh/claw.pem -r dist/* ubuntu@170.106.194.111:~/p0-mvp-frontend/
+前端部署: cd frontend && npx vite build && scp -i C:/Users/18380/.ssh/claw.pem -r dist/* ubuntu@170.106.194.111:~/p0-mvp-frontend/
 代码已提交: ✅ git commit完成 (2026-05-14)
 当前状态: P0 MVP部署验收完成，Sprint 1 90% + Sprint 2 95% + Sprint 3 75%
 下一优先: S2-6 World Info预算管理 + S2-7 行为一致性评测 + S3-5 WebSocket实时推送
+项目结构: 标准布局 (backend/ + frontend/ + tools/ + docs/ + archive/)
 ```
 
 ---
@@ -147,24 +148,14 @@
 | 前端端口 | 80 (nginx) |
 | nginx配置 | /etc/nginx/sites-enabled/default |
 
-## 八、未提交修改清单 (2026-05-12 晚)
+## 八、目录结构重构 (2026-05-14) ✅
+
+已从阶段命名布局重构为标准项目布局，部署脚本已同步更新：
 
 ```
-M  p0-mvp/backend/app/main.py               (+885 lines, 核心集成+路由别名+中文化+location对象化)
-M  p0-mvp/backend/app/core/agent/agent.py    (importance参数)
-M  p0-mvp/backend/app/core/knowledge/knowledge_graph.py (Path import)
-M  p0-mvp/backend/app/core/sandbox/action_executor.py   (+OpenAIClient)
-M  p0-mvp/backend/app/core/sandbox/turn_scheduler.py    (error logging)
-M  p0-mvp/frontend/src/App.tsx               (CreateWorldModal+worldData fetch)
-M  p0-mvp/frontend/src/api.ts                (+createWorld, +Agent/Location types, 路径修正)
-M  p0-mvp/frontend/src/components/WorldGraph.tsx (动态节点替换硬编码) ← NEW
-M  p0-mvp/frontend/src/components/AgentList.tsx  (真实agent数据展示) ← NEW
-M  p0-mvp/frontend/src/index.css             (+modal/template-card样式)
-M  p0-mvp/frontend/vite.config.ts            (+代理规则)
-?? p0-mvp/frontend/src/components/CreateWorldModal.tsx  (新建)
-?? docs/                                     (文档目录)
-?? p0-mvp/backend/data/                      (本地数据)
-?? p0-mvp/deploy.*                           (部署脚本)
+重构前:  p0-mvp/backend/  p0-mvp/frontend/  poc-sandbox/
+重构后:  backend/         frontend/         archive/poc-sandbox/
+新增:    tools/ (deploy.bat, deploy.ps1, install.sh)
 ```
 
 ## 九、技术选型
