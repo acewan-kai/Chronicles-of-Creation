@@ -1,16 +1,16 @@
 # 项目进度文档
 
-> 最后更新: 2026-05-13 23:22 (S2-4 KnowledgeGraph动态更新完成)
+> 最后更新: 2026-05-14 11:10 (Sprint 2收尾——Reflector LLM化+Lorebook注入+EventTimeline筛选)
 
 ## 快速恢复指南（下次开工读这里）
 
 ```
-服务器: ssh -i ~/.ssh/claw.pem ubuntu@170.106.194.111
-后端重启: ssh -i ~/.ssh/claw.pem ubuntu@170.106.194.111 "cd ~/p0-mvp-backend && setsid ~/p0-mvp-venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 & disown"
-前端部署: cd p0-mvp/frontend && npx vite build && scp -i ~/.ssh/claw.pem -r dist/* ubuntu@170.106.194.111:~/p0-mvp-frontend/
-代码已提交: ✅ git commit完成 (2026-05-13)
-当前状态: P0 MVP 部署验收完成，Sprint 1 100% + Sprint 2~30% + Sprint 3~80%
-下一优先: S2-3 Reflector LLM化 + S2-5 Lorebook上下文注入 + EventTimeline筛选
+服务器: ssh -i C:/Users/18380/.ssh/claw.pem ubuntu@170.106.194.111
+后端重启: ssh -i C:/Users/18380/.ssh/claw.pem ubuntu@170.106.194.111 "cd ~/p0-mvp-backend && nohup ~/p0-mvp-venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &"
+前端部署: cd p0-mvp/frontend && npx vite build && scp -i C:/Users/18380/.ssh/claw.pem -r dist/* ubuntu@170.106.194.111:~/p0-mvp-frontend/
+代码已提交: ✅ git commit完成 (2026-05-14)
+当前状态: P0 MVP部署验收完成，Sprint 1 90% + Sprint 2 95% + Sprint 3 75%
+下一优先: S2-6 World Info预算管理 + S2-7 行为一致性评测 + S3-5 WebSocket实时推送
 ```
 
 ---
@@ -42,26 +42,26 @@
 | S1-5 | LLM适配层(DeepSeek/OpenAI/Mock) | ✅ 三模式可切换 |
 | S1-6 | 端到端测试 | ✅ 创建→启动→事件→停止 |
 
-### Sprint 2: 智能体 + 知识图谱 — ✅ 75%
+### Sprint 2: 智能体 + 知识图谱 — ✅ 95%
 
 | # | 任务 | 状态 |
 |---|------|------|
 | S2-1 | MemoryStream遗忘曲线 | ✅ 艾宾浩斯公式, avg_retention=80.7% |
 | S2-2 | Planner LLM集成 | ✅ LLM生成3步计划, 角色化Mock fallback |
-| S2-3 | Reflector周期性反思 | ⚠️ 20轮触发，简化实现 |
+| S2-3 | Reflector周期性反思 | ✅ LLM驱动角色化反思, 三级fallback链, agent存储 |
 | S2-4 | KnowledgeGraph动态更新 | ✅ 互动事件驱动关系边创建/权重变化/类型升级 |
-| S2-5 | Lorebook上下文注入 | ❌ YAML模板已有 |
+| S2-5 | Lorebook上下文注入 | ✅ 模板自动构建词条, NPC prompt注入(600字限制) |
 | S2-6 | World Info预算管理 | ❌ |
 | S2-7 | 行为一致性评测 | ❌ |
 
-### Sprint 3: 前端仪表盘 — ⚠️ 50%
+### Sprint 3: 前端仪表盘 — ✅ 75%
 
 | # | 任务 | 状态 |
 |---|------|------|
 | S3-1 | WorldGraph动态数据源 | ✅ **本次完成** |
 | S3-2 | MetricsPanel实时数据 | ⚠️ 组件已有 |
 | S3-3 | AgentList详情面板 | ✅ **本次完成** |
-| S3-4 | EventTimeline筛选 | ❌ |
+| S3-4 | EventTimeline筛选 | ✅ 搜索框+角色下拉+回合范围+分页+高亮 |
 | S3-5 | WebSocket实时推送 | ❌ |
 | S3-6 | **创建世界UI** | ✅ **本次完成** |
 | S3-7 | 端到端UI验收 | ❌ |
@@ -119,14 +119,14 @@
 - [x] ~~git commit~~ ✅ 2026-05-13
 
 ### P1 重要
-- [ ] Planner LLM集成（替换简化实现）
-- [ ] MemoryStream遗忘曲线（记忆>100条自动遗忘）
-- [ ] EventTimeline添加筛选（按类型/角色/回合）
+- [x] Planner LLM集成 ✅ S2-2
+- [x] MemoryStream遗忘曲线 ✅ S2-1
+- [x] EventTimeline添加筛选 ✅ S3-4
 
 ### P2 一般
-- [ ] KnowledgeGraph关系动态更新
-- [ ] Lorebook上下文注入到模拟循环
-- [ ] 前端EventTimeline搜索/分页
+- [x] KnowledgeGraph关系动态更新 ✅ S2-4
+- [x] Lorebook上下文注入到模拟循环 ✅ S2-5
+- [x] 前端EventTimeline搜索/分页 ✅ S3-4
 - [ ] MetricsPanel接入go_status等验收指标
 
 ### P3 优化
