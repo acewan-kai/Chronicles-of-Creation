@@ -920,6 +920,47 @@ async def get_world(world_id: str):
     return world_data
 
 
+@app.get("/api/worlds/{world_id}/agents", tags=["世界管理"], summary="获取角色列表", description="返回世界上所有NPC的详细信息，包括身份、位置、记忆统计、当前计划等。")
+async def list_agents(world_id: str):
+    """获取所有角色"""
+    ctx = simulations.get(world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+    return {
+        "agents": [a.to_dict() for a in ctx.agents.values()],
+        "count": len(ctx.agents)
+    }
+
+
+@app.delete("/api/worlds/{world_id}", tags=["世界管理"], summary="删除世界", description="删除世界及其所有相关数据（事件、对话、模拟状态）。删除后不可恢复。")
+async def delete_world(world_id: str):
+    """删除世界"""
+    if world_id not in worlds_db:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    # 停止模拟
+    ctx = simulations.get(world_id)
+    if ctx:
+        ctx.stop()
+        simulations.pop(world_id, None)
+
+    # 删除事件数据库
+    if ctx and ctx.event_store:
+        import os
+        db_path = ctx.event_store.db_path
+        jsonl_path = ctx.event_store.jsonl_path
+        if os.path.exists(db_path):
+            os.remove(db_path)
+        if os.path.exists(jsonl_path):
+            os.remove(jsonl_path)
+
+    # 从数据库移除
+    worlds_db.pop(world_id, None)
+    usage_tracker.end_session(world_id)
+
+    return {"status": "deleted", "world_id": world_id}
+
+
 @app.patch("/api/worlds/{world_id}/agents/{agent_id}", tags=["世界管理"], summary="更新角色信息", description="修改NPC的名称、身份、性格等属性。用于用户自定义角色。")
 async def update_agent(world_id: str, agent_id: str, req: dict):
     """更新角色信息"""
