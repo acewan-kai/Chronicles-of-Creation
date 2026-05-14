@@ -37,6 +37,9 @@
 ### 角色自定义
 创建世界后，可修改任意NPC的名称、身份、性格，使其更符合你的创作需求。
 
+### 世界重置
+不必重新创建世界，直接重置到初始状态，保留你的角色配置设定，重新运行模拟。
+
 ## 使用场景
 
 **写小说卡文？**
@@ -98,6 +101,10 @@ curl -X PATCH http://localhost:8000/api/worlds/{world_id}/agents/boss_shen \
 curl -X POST http://localhost:8000/api/novel/export \
   -H "Content-Type: application/json" \
   -d '{"world_id":"{world_id}","start_turn":1,"end_turn":20,"format":"markdown"}'
+
+# 重置世界（重新运行）
+curl -X POST http://localhost:8000/api/worlds/{world_id}/reset \
+  -H "Content-Type: application/json"
 ```
 
 ## 技术栈
