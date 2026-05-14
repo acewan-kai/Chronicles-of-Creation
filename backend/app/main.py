@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 from app.core.sandbox.world_state import WorldState, Location
 from app.core.sandbox.turn_scheduler import TurnScheduler, TurnMetrics
 from app.core.sandbox.action_executor import (
-    ActionExecutor, MockLLMClient, DeepSeekClient, OpenAIClient, ActionResult
+    ActionExecutor, ActionResult
 )
 from app.core.sandbox.event_dispatcher import EventDispatcher, EventType
 from app.core.events.event_store import EventStore, Event as DBEvent
@@ -34,6 +34,7 @@ from app.core.scoring.scorer import AestheticScorer
 from app.core.scoring.behavior_evaluator import BehaviorEvaluator, EvalTracker
 from app.core.sandbox.narrative_extractor import NarrativeExtractor
 from app.core.sandbox.story_sifter import StorySifter
+from app.core.sandbox.multi_llm_client import LLMClientFactory, MultiLLMClient, LLMProvider
 from app.core.usage_tracker import UsageTracker
 from app.core.onboarding import OnboardingGuide
 
@@ -143,56 +144,41 @@ class SimulationContext:
 
 # ── LLM客户端工厂 ────────────────────────────────────────
 def create_llm_client(mode: str = "auto") -> tuple[Any, str]:
-    """根据环境变量创建LLM客户端
+    """根据环境变量创建LLM客户端（多Provider统一接口）
 
-    Args:
-        mode: "auto"|"mock"|"deepseek"|"openai"
+    支持Provider:
+    - deepseek, openai, kimi, minimax, zhipu, qwen, hunyuan, doubao, custom, mock
+    - 别名: xiaomi/xiaoai → deepseek; moonshot → kimi; glm → zhipu; etc.
 
     Returns:
-        (client, mode_name) — client实例和实际使用的模式名
+        (client, provider_name)
     """
-    if mode == "mock":
-        return MockLLMClient(), "mock"
-
-    if mode == "deepseek":
-        key = os.getenv("DEEPSEEK_API_KEY")
-        if not key:
-            print("[LLM] DEEPSEEK_API_KEY not set, falling back to mock")
-            return MockLLMClient(), "mock"
-        base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-        return DeepSeekClient(api_key=key, base_url=base_url), "deepseek"
-
-    if mode == "openai":
-        key = os.getenv("OPENAI_API_KEY")
-        if not key:
-            print("[LLM] OPENAI_API_KEY not set, falling back to mock")
-            return MockLLMClient(), "mock"
-        base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        return OpenAIClient(api_key=key, base_url=base_url), "openai"
-
-    # auto mode
-    deepseek_key = os.getenv("DEEPSEEK_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
-
-    if deepseek_key:
-        base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-        print(f"[LLM] Auto-selected DeepSeek (DEEPSEEK_API_KEY found)")
-        return DeepSeekClient(api_key=deepseek_key, base_url=base_url), "deepseek"
-
-    if openai_key:
-        base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        print(f"[LLM] Auto-selected OpenAI (OPENAI_API_KEY found)")
-        return OpenAIClient(api_key=openai_key, base_url=base_url), "openai"
-
-    print("[LLM] No API key found, using MockLLMClient (no real LLM calls)")
-    return MockLLMClient(), "mock"
+    factory = LLMClientFactory()
+    return factory.create(mode)
 
 
 def get_llm_cost_estimate(mode_name: str, turn_count: int, npc_count: int) -> dict:
     """估算LLM调用成本"""
     rates = {
-        "deepseek": 0.0001,  # ¥0.0001/1K tokens
-        "openai": 0.0015,    # $0.0015/1K tokens (gpt-4o-mini)
+        # DeepSeek - ¥0.001/1K tokens (极低价)
+        "deepseek": 0.001,
+        # OpenAI - $0.0015/1K tokens (gpt-4o-mini)
+        "openai": 0.011,
+        # Kimi (Moonshot) - ¥0.012/1K tokens
+        "kimi": 0.012,
+        # MiniMax - ¥0.01/1K tokens
+        "minimax": 0.01,
+        # 智谱GLM - ¥0.001/1K tokens
+        "zhipu": 0.001,
+        # 通义千问 - ¥0.002/1K tokens
+        "qwen": 0.002,
+        # 混元 - ¥0.006/1K tokens
+        "hunyuan": 0.006,
+        # 豆包 - ¥0.003/1K tokens
+        "doubao": 0.003,
+        # Custom - 默认0
+        "custom": 0.0,
+        # Mock - 免费
         "mock": 0.0,
     }
     est_tokens_per_call = 500  # system_prompt ~200 + user_prompt ~100 + response ~200
