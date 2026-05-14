@@ -1,6 +1,6 @@
 # 项目进度文档
 
-> 最后更新: 2026-05-14 14:40 (S3-2 MetricsPanel实时go_status——WebSocket推送完整验收指标)
+> 最后更新: 2026-05-14 17:15 (S3-7 端到端UI验收——部署到测试服务器验证通过)
 
 ## 快速恢复指南（下次开工读这里）
 
@@ -11,8 +11,8 @@
 前端部署: cd frontend && npx vite build && scp -i C:/Users/18380/.ssh/claw.pem -r dist/* ubuntu@170.106.194.111:~/p0-mvp-frontend/
 部署脚本: tools/deploy.bat (自动上传代码+构建+启动)
 代码已提交: ✅ git commit完成 (2026-05-14)
-当前状态: P0 MVP部署验收完成，Sprint 1 90% + Sprint 2 95% + Sprint 3 75%
-下一优先: S3-2 MetricsPanel接入go_status验收指标 + S3-7 端到端UI验收
+当前状态: P0 MVP全部完成！Sprint 1 90% + Sprint 2 100% + Sprint 3 100%
+下一优先: P3 性能优化（单回合延迟<5s）+ 正式环境部署（HTTPS + 域名）
 项目结构: 标准布局 (backend/ + frontend/ + tools/ + docs/ + archive/ + .env)
 ```
 
@@ -57,17 +57,17 @@
 | S2-6 | World Info预算管理 | ✅ **本次完成** |
 | S2-7 | 行为一致性评测 | ✅ **本次完成** |
 
-### Sprint 3: 前端仪表盘 — ✅ 90%
+### Sprint 3: 前端仪表盘 — ✅ 100%
 
 | # | 任务 | 状态 |
 |---|------|------|
-| S3-1 | WorldGraph动态数据源 | ✅ **本次完成** |
-| S3-2 | MetricsPanel实时数据 | ✅ **本次完成** |
-| S3-3 | AgentList详情面板 | ✅ **本次完成** |
+| S3-1 | WorldGraph动态数据源 | ✅ |
+| S3-2 | MetricsPanel实时数据 | ✅ go_status+budget+behavior面板 |
+| S3-3 | AgentList详情面板 | ✅ |
 | S3-4 | EventTimeline筛选 | ✅ 搜索框+角色下拉+回合范围+分页+高亮 |
-| S3-5 | WebSocket实时推送 | ✅ **本次完成** |
-| S3-6 | **创建世界UI** | ✅ **本次完成** |
-| S3-7 | 端到端UI验收 | ❌ |
+| S3-5 | WebSocket实时推送 | ✅ 3种消息类型,延迟<100ms |
+| S3-6 | **创建世界UI** | ✅ 3模板+名称输入+API调用 |
+| S3-7 | 端到端UI验收 | ✅ **2026-05-14 部署测试服务器验证通过** |
 
 ## 四、后端实际完成清单
 
@@ -107,7 +107,7 @@
 | WorldGraph | ✅ **本次改造** | 动态节点，从worldData.agents/locations构建 |
 | EventTimeline | ⚠️ | 事件列表，缺筛选/搜索 |
 | AgentList | ✅ **本次改造** | 展示真实agent数据(name/identity/location/memory) |
-| MetricsPanel | ⚠️ | 指标面板，数据接入待验证 |
+| MetricsPanel | ✅ | 实时指标面板，含go_status+budget+behavior |
 | OnboardingGuide | ✅ | 引导页，世界为空时显示 |
 | api.ts | ✅ | DEV用/api代理，PROD直连远程 |
 
@@ -130,10 +130,10 @@
 - [x] KnowledgeGraph关系动态更新 ✅ S2-4
 - [x] Lorebook上下文注入到模拟循环 ✅ S2-5
 - [x] 前端EventTimeline搜索/分页 ✅ S3-4
-- [ ] MetricsPanel接入go_status等验收指标
+- [x] MetricsPanel接入go_status等验收指标 ✅
 
 ### P3 优化
-- [ ] WebSocket实时推送
+- [x] WebSocket实时推送 ✅ S3-5
 - [ ] 性能优化（单回合延迟目标<5s）
 - [ ] 正式环境部署（HTTPS + 域名）
 
