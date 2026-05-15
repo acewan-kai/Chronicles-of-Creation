@@ -304,4 +304,54 @@ export const api = {
     });
     return response.data;
   },
+
+  // C02: 获取一致性守护状态
+  async getConsistencyGuardian(worldId: string): Promise<any> {
+    const response = await axios.get(`${API_BASE}/worlds/${worldId}/consistency/guardian`);
+    return response.data;
+  },
+
+  // F04: 降临到NPC
+  async descendToAgent(worldId: string, agentId: string): Promise<any> {
+    const response = await axios.post(`${API_BASE}/worlds/${worldId}/agents/${agentId}/descend`);
+    return response.data;
+  },
+
+  // F04: 退出降临
+  async exitDescend(worldId: string, agentId: string): Promise<any> {
+    const response = await axios.delete(`${API_BASE}/worlds/${worldId}/agents/${agentId}/descend`);
+    return response.data;
+  },
+
+  // F04: 降临行动
+  async descendAct(worldId: string, agentId: string, actionType: string, content: string, target?: string): Promise<any> {
+    const response = await axios.post(`${API_BASE}/worlds/${worldId}/agents/${agentId}/descend/act`, {
+      action_type: actionType,
+      content,
+      target,
+    });
+    return response.data;
+  },
+
+  // F04: 获取降临状态
+  async getDescendStatus(worldId: string, agentId: string): Promise<any> {
+    const response = await axios.get(`${API_BASE}/worlds/${worldId}/agents/${agentId}/descend/status`);
+    return response.data;
+  },
+
+  // F04: 生成降临选项
+  async getDescendOptions(worldId: string, agentId: string, situation?: string): Promise<any> {
+    const response = await axios.post(`${API_BASE}/worlds/${worldId}/agents/${agentId}/descend/options`, {
+      situation: situation || '',
+    });
+    return response.data;
+  },
+
+  // F04: 获取降临日志
+  async getDescendLogs(worldId: string, limit?: number): Promise<any> {
+    const response = await axios.get(`${API_BASE}/worlds/${worldId}/descend/logs`, {
+      params: { limit: limit || 10 }
+    });
+    return response.data;
+  },
 };

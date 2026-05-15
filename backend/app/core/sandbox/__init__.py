@@ -4,6 +4,8 @@ A01 沙盒模拟核心模块
 D01 冲突注入引擎
 D02 演化停滞检测
 D03 外部扰动投放
+C02 角色一致性守护
+F04 降临模式管理器
 """
 
 from .world_state import WorldState, Location
@@ -13,6 +15,8 @@ from .event_dispatcher import EventDispatcher
 from .conflict_injector import ConflictInjector, ConflictType, ConflictEvent, HeatMetrics
 from .stagnation_detector import StagnationDetector, StagnationReport, StagnationAlert, StagnationType
 from .disturbance_injector import DisturbanceInjector, DisturbanceEvent, DisturbanceTemplate, DisturbanceCategory, Frequency
+from .consistency_guardian import ConsistencyGuardian, Deviation, GuardianReport, DeviationType, Severity
+from .descend_manager import DescendManager, DescendContext, DescendAction, DescentLog, DescendState
 
 __all__ = [
     "WorldState",
@@ -33,4 +37,14 @@ __all__ = [
     "DisturbanceTemplate",
     "DisturbanceCategory",
     "Frequency",
+    "ConsistencyGuardian",
+    "Deviation",
+    "GuardianReport",
+    "DeviationType",
+    "Severity",
+    "DescendManager",
+    "DescendContext",
+    "DescendAction",
+    "DescentLog",
+    "DescendState",
 ]

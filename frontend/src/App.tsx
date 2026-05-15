@@ -8,12 +8,13 @@ import { MetricsPanel } from './components/MetricsPanel';
 import { OnboardingGuide } from './components/OnboardingGuide';
 import { CreateWorldModal } from './components/CreateWorldModal';
 import { StyleSelector } from './components/StyleSelector';
+import { DescentMode } from './components/DescentMode';
 import { api, connectWebSocket, World, Event, Agent, Location, NpcPosition, WsMessage } from './api';
 
 function App() {
   const [worldId, setWorldId] = useState<string>('');
   const [worlds, setWorlds] = useState<World[]>([]);
-  const [activeTab, setActiveTab] = useState<'graph' | 'timeline' | 'map' | 'timeline-controls' | 'style'>('graph');
+  const [activeTab, setActiveTab] = useState<'graph' | 'timeline' | 'map' | 'timeline-controls' | 'style' | 'descent'>('graph');
   const [isSimulating, setIsSimulating] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
@@ -280,6 +281,12 @@ function App() {
             >
               风格生成
             </button>
+            <button
+              className={`tab-btn ${activeTab === 'descent' ? 'active' : ''}`}
+              onClick={() => setActiveTab('descent')}
+            >
+              降临模式
+            </button>
           </nav>
 
           <div className="tab-content">
@@ -308,6 +315,12 @@ function App() {
               />
             ) : activeTab === 'style' ? (
               <StyleSelector worldId={worldId} />
+            ) : activeTab === 'descent' ? (
+              <DescentMode
+                worldId={worldId}
+                agents={worldData?.agents || []}
+                isSimulating={isSimulating}
+              />
             ) : (
               <EventTimeline events={events} />
             )}

@@ -2,8 +2,8 @@
 task: Sprint 3 品味学习 Phase 1 — 风格预设+生成器
 slug: 20260515-sprint3-taste-learning
 effort: Extended
-phase: verify
-progress: 16/18
+phase: complete
+progress: 17/18
 mode: ALGORITHM
 started: 2026-05-15T17:50:00
 updated: 2026-05-15T17:50:00
@@ -46,5 +46,5 @@ Sprint 3 of P1: G02 Passive Taste学习 + G04 风格化文本生成基础版。
 - [x] ISC-14: 与现有LLM客户端集成（复用AsyncOpenAI）
 - [x] ISC-15: 前端新增风格选择器组件
 - [x] ISC-16: 前端build 0错误
-- [ ] ISC-17: git commit
+- [x] ISC-17: git commit
 - [x] ISC-18: 风格预设可被E03故事淘洗管道调用

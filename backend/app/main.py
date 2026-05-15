@@ -40,6 +40,8 @@ from app.core.sandbox.conflict_injector import ConflictInjector, ConflictType
 from app.core.sandbox.stagnation_detector import StagnationDetector, StagnationReport
 from app.core.sandbox.disturbance_injector import DisturbanceInjector, DisturbanceEvent, Frequency
 from app.core.sandbox.multi_llm_client import LLMClientFactory, MultiLLMClient, LLMProvider
+from app.core.sandbox.consistency_guardian import ConsistencyGuardian, Deviation, GuardianReport
+from app.core.sandbox.descend_manager import DescendManager, DescendContext, DescendAction, DescentLog
 from app.core.usage_tracker import UsageTracker
 from app.core.onboarding import OnboardingGuide
 from app.core.db import Database
@@ -163,6 +165,8 @@ class SimulationContext:
         self.conflict_injector: Optional[ConflictInjector] = None
         self.stagnation_detector: Optional[StagnationDetector] = None
         self.disturbance_injector: Optional[DisturbanceInjector] = None
+        self.consistency_guardian: Optional[ConsistencyGuardian] = None
+        self.descend_manager: Optional[DescendManager] = None
         self._sim_task: Optional[asyncio.Task] = None
         self._running: bool = False
 
@@ -549,6 +553,8 @@ async def _init_world_simulation(world_id: str, template_id: str, world_name: st
     ctx.conflict_injector = ConflictInjector(world_id)
     ctx.stagnation_detector = StagnationDetector(world_id)
     ctx.disturbance_injector = DisturbanceInjector(world_id)
+    ctx.consistency_guardian = ConsistencyGuardian(world_id)
+    ctx.descend_manager = DescendManager(world_id)
 
     # 世界状态
     template = TEMPLATE_WORLDS.get(template_id, TEMPLATE_WORLDS["cultivation"])
@@ -2555,6 +2561,218 @@ async def blend_style_vectors(req: StyleBlendRequest):
     )
 
     return {"blended_vector": blended, "preset_name": req.preset_name}
+
+
+# ═══════════════════════════════════════════════════════════
+# C02 角色一致性守护 API
+# ═══════════════════════════════════════════════════════════
+
+
+@app.get("/api/worlds/{world_id}/consistency/guardian", tags=["世界管理"], summary="C02 一致性守护状态", description="获取角色一致性守护的运行状态，包含偏离检测历史、恢复率统计。")
+async def get_consistency_guardian(world_id: str):
+    """获取一致性守护报告"""
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.consistency_guardian:
+        # 懒初始化
+        if ctx:
+            ctx.consistency_guardian = ConsistencyGuardian(world_id)
+        guardian = ctx.consistency_guardian if ctx else ConsistencyGuardian(world_id)
+    else:
+        guardian = ctx.consistency_guardian
+
+    return {
+        "world_id": world_id,
+        "guardian": guardian.to_dict(),
+    }
+
+
+class CheckAgentRequest(BaseModel):
+    agent_id: str = Field(..., description="NPC ID")
+    recent_actions: List[Dict] = Field(default_factory=list, description="最近动作")
+    recent_dialogues: List[Dict] = Field(default_factory=list, description="最近对话")
+    relationships: Dict[str, Any] = Field(default_factory=dict, description="关系网络")
+    current_turn: int = Field(0, description="当前回合")
+
+
+@app.post("/api/worlds/{world_id}/consistency/check", tags=["世界管理"], summary="C02 单NPC一致性检测", description="对单个NPC执行行为/语言/关系三维一致性检测。")
+async def check_agent_consistency(world_id: str, req: CheckAgentRequest):
+    """对单个NPC执行三维一致性检测"""
+    ctx = simulations.get(world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    if not ctx.consistency_guardian:
+        ctx.consistency_guardian = ConsistencyGuardian(world_id)
+
+    # 查找agent
+    agent = ctx.agents.get(req.agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent {req.agent_id} not found")
+
+    deviations = ctx.consistency_guardian.check_agent(
+        agent=agent,
+        recent_actions=req.recent_actions,
+        recent_dialogues=req.recent_dialogues,
+        relationships=req.relationships,
+        current_turn=req.current_turn or (ctx.world_state.current_turn if ctx.world_state else 0),
+    )
+
+    return {
+        "world_id": world_id,
+        "agent_id": req.agent_id,
+        "deviations": [d.to_dict() for d in deviations],
+        "deviations_found": len(deviations),
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# F04 降临模式 API
+# ═══════════════════════════════════════════════════════════
+
+
+class DescendRequest(BaseModel):
+    """降临请求（空请求体即可，默认降临到当前World的第一个NPC）"""
+
+
+class DescendActRequest(BaseModel):
+    action_type: str = Field("dialogue", description="行动类型: dialogue/observe/interact")
+    content: str = Field(..., description="行动内容")
+    target: Optional[str] = Field(None, description="目标对象")
+
+
+@app.post("/api/worlds/{world_id}/agents/{agent_id}/descend", tags=["世界管理"], summary="F04 降临到NPC", description="玩家化身进入指定NPC视角。降临延迟≤3s，自动快照NPC状态。")
+async def descend_to_agent(world_id: str, agent_id: str):
+    """降临到指定NPC"""
+    ctx = simulations.get(world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    agent = ctx.agents.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
+
+    if not ctx.descend_manager:
+        ctx.descend_manager = DescendManager(world_id)
+
+    try:
+        context = await ctx.descend_manager.descend(
+            agent=agent,
+            world_state=ctx.world_state,
+            knowledge_graph=ctx.knowledge_graph,
+        )
+        return {
+            "world_id": world_id,
+            "agent_id": agent_id,
+            "status": "active",
+            "context": context.to_dict(),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.delete("/api/worlds/{world_id}/agents/{agent_id}/descend", tags=["世界管理"], summary="F04 退出降临", description="退出降临模式，自动生成降临日志。退出延迟≤3s。")
+async def exit_descend(world_id: str, agent_id: str):
+    """退出降临模式"""
+    ctx = simulations.get(world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    if not ctx.descend_manager:
+        raise HTTPException(status_code=404, detail="No active descend session")
+
+    if ctx.descend_manager.current_agent_id != agent_id:
+        raise HTTPException(status_code=409, detail="Descend agent mismatch")
+
+    try:
+        log = await ctx.descend_manager.exit_descend()
+        return {
+            "world_id": world_id,
+            "agent_id": agent_id,
+            "status": "exited",
+            "log": log.to_dict(),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.post("/api/worlds/{world_id}/agents/{agent_id}/descend/act", tags=["世界管理"], summary="F04 降临行动", description="以NPC身份执行行动（对话/观察/互动）。")
+async def descend_act(world_id: str, agent_id: str, req: DescendActRequest):
+    """以NPC身份执行行动"""
+    ctx = simulations.get(world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    if not ctx.descend_manager:
+        raise HTTPException(status_code=404, detail="No active descend session")
+
+    if ctx.descend_manager.current_agent_id != agent_id:
+        raise HTTPException(status_code=409, detail="Descend agent mismatch")
+
+    try:
+        action = await ctx.descend_manager.act(
+            action_type=req.action_type,
+            content=req.content,
+            target=req.target,
+            world_state=ctx.world_state,
+        )
+        return {
+            "world_id": world_id,
+            "agent_id": agent_id,
+            "action": action.to_dict(),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.get("/api/worlds/{world_id}/agents/{agent_id}/descend/status", tags=["世界管理"], summary="F04 降临状态", description="获取当前降临状态：是否活跃、降临上下文、最近行动。")
+async def get_descend_status(world_id: str, agent_id: str):
+    """获取当前降临状态"""
+    ctx = simulations.get(world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    if not ctx.descend_manager:
+        return {"world_id": world_id, "agent_id": agent_id, "status": "idle", "context": None}
+
+    status = ctx.descend_manager.get_status()
+    return {"world_id": world_id, "agent_id": agent_id, **status}
+
+
+class DescendOptionsRequest(BaseModel):
+    situation: str = Field("", description="当前情境描述")
+
+
+@app.post("/api/worlds/{world_id}/agents/{agent_id}/descend/options", tags=["世界管理"], summary="F04 生成降临选项", description="为当前降临情境生成≥4个对话/行动选项。")
+async def generate_descend_options(world_id: str, agent_id: str, req: DescendOptionsRequest):
+    """生成降临选项"""
+    ctx = simulations.get(world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    if not ctx.descend_manager:
+        raise HTTPException(status_code=404, detail="No active descend session")
+
+    if ctx.descend_manager.current_agent_id != agent_id:
+        raise HTTPException(status_code=409, detail="Descend agent mismatch")
+
+    llm = getattr(ctx, 'llm_client', None)
+    options = await ctx.descend_manager.generate_options(
+        situation=req.situation,
+        llm_client=llm,
+    )
+
+    return {"world_id": world_id, "agent_id": agent_id, "options": options, "count": len(options)}
+
+
+@app.get("/api/worlds/{world_id}/descend/logs", tags=["世界管理"], summary="F04 降临日志列表", description="获取世界的降临日志历史。")
+async def get_descend_logs(world_id: str, limit: int = 10):
+    """获取降临日志"""
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.descend_manager:
+        return {"world_id": world_id, "logs": [], "total": 0}
+
+    logs = ctx.descend_manager.get_logs(limit=limit)
+    return {"world_id": world_id, "logs": logs, "total": len(logs)}
 
 
 if __name__ == "__main__":
