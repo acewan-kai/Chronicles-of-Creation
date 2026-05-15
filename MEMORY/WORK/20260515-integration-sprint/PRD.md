@@ -2,7 +2,7 @@
 task: Sprint 2 收尾 — WebSocket NPC位置 + 集成修补
 slug: 20260515-integration-sprint
 effort: Standard
-phase: verify
+phase: complete
 progress: 8/8
 mode: ALGORITHM
 started: 2026-05-15T17:30:00

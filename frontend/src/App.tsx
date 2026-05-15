@@ -7,12 +7,13 @@ import { AgentList } from './components/AgentList';
 import { MetricsPanel } from './components/MetricsPanel';
 import { OnboardingGuide } from './components/OnboardingGuide';
 import { CreateWorldModal } from './components/CreateWorldModal';
+import { StyleSelector } from './components/StyleSelector';
 import { api, connectWebSocket, World, Event, Agent, Location, NpcPosition, WsMessage } from './api';
 
 function App() {
   const [worldId, setWorldId] = useState<string>('');
   const [worlds, setWorlds] = useState<World[]>([]);
-  const [activeTab, setActiveTab] = useState<'graph' | 'timeline' | 'map' | 'timeline-controls'>('graph');
+  const [activeTab, setActiveTab] = useState<'graph' | 'timeline' | 'map' | 'timeline-controls' | 'style'>('graph');
   const [isSimulating, setIsSimulating] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
@@ -273,6 +274,12 @@ function App() {
             >
               世界地图
             </button>
+            <button
+              className={`tab-btn ${activeTab === 'style' ? 'active' : ''}`}
+              onClick={() => setActiveTab('style')}
+            >
+              风格生成
+            </button>
           </nav>
 
           <div className="tab-content">
@@ -299,6 +306,8 @@ function App() {
                 isSimulating={isSimulating}
                 npcPositions={npcPositions}
               />
+            ) : activeTab === 'style' ? (
+              <StyleSelector worldId={worldId} />
             ) : (
               <EventTimeline events={events} />
             )}

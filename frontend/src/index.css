@@ -1646,3 +1646,150 @@ body {
   background: none !important;
   border: none !important;
 }
+
+/* ── 风格选择器 (StyleSelector) ───────────────────────── */
+.style-selector {
+  padding: 16px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.style-selector h3 {
+  margin-bottom: 12px;
+  color: var(--primary);
+}
+
+.style-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.style-preset-card {
+  padding: 10px;
+  border: 2px solid #3a3a5c;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #1a1a2e;
+}
+
+.style-preset-card:hover {
+  border-color: var(--primary);
+  background: #1e1e3a;
+}
+
+.style-preset-card.active {
+  border-color: var(--primary);
+  background: #16213e;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+}
+
+.style-preset-card strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.style-preset-card p {
+  font-size: 12px;
+  color: #999;
+  line-height: 1.4;
+}
+
+.style-vector-preview {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #1a1a2e;
+  border-radius: 8px;
+}
+
+.style-vector-preview > strong {
+  font-size: 13px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.vector-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vector-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vector-dim-label {
+  width: 72px;
+  font-size: 11px;
+  color: #aaa;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.vector-bar-track {
+  flex: 1;
+  height: 8px;
+  background: #2a2a4a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.vector-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.vector-dim-value {
+  width: 32px;
+  font-size: 11px;
+  color: #ccc;
+  text-align: right;
+}
+
+.style-intensity {
+  margin-bottom: 16px;
+}
+
+.style-intensity label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.style-intensity input[type="range"] {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.intensity-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #777;
+  margin-top: 2px;
+}
+
+.style-result {
+  margin-top: 16px;
+  padding: 12px;
+  background: #1a1a2e;
+  border-radius: 8px;
+  border-left: 3px solid var(--primary);
+}
+
+.chapter-text {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  max-height: 500px;
+  overflow-y: auto;
+  color: #ddd;
+}

@@ -47,6 +47,10 @@ from app.core.auth import (
     hash_password, verify_password, create_token,
     get_current_user_id, require_user_id,
 )
+from app.core.taste import (
+    taste_encoder, style_generator, StyleConfig,
+    TasteProfile, GenerationResult,
+)
 
 # 加载项目根目录 .env（兼容本地/服务器两种路径层级）
 _env_path = Path(__file__).resolve().parent.parent / '.env'   # 服务器: ~/p0-mvp-backend/.env
@@ -2425,6 +2429,132 @@ async def simulate_stop_alias(req: dict):
 @app.get("/simulate/status", tags=["模拟控制"], summary="[别名] 模拟状态", description="无/api前缀别名，生产环境使用。")
 async def simulate_status_alias(world_id: str = ""):
     return await simulate_status(world_id)
+
+
+# ═══════════════════════════════════════════════════════════
+# G04 风格化生成 API
+# ═══════════════════════════════════════════════════════════
+
+
+@app.get("/api/style/presets", tags=["品味学习"], summary="G04 风格预设列表", description="获取5种中文小说风格预设（爽文/冷峻白描/热血战记/缠绵言情/硬核世界观），含12维向量。")
+async def get_style_presets():
+    return {"presets": style_generator.get_presets()}
+
+
+class StyleGenerateRequest(BaseModel):
+    world_id: str = Field(..., description="世界ID")
+    style_name: str = Field("shuangwen", description="风格名: shuangwen/lean/hot_blood/romance/hardcore")
+    intensity: int = Field(50, ge=0, le=100, description="风格强度 0-100")
+    chapter_number: int = Field(1, ge=1, description="章节编号")
+    world_context: str = Field("", description="世界观背景（为空则自动提取）")
+    story_context: str = Field("", description="当前剧情上下文（为空则自动提取）")
+
+
+@app.post("/api/style/generate", tags=["品味学习"], summary="G04 风格化章节生成", description="基于风格向量调用LLM生成小说章节，支持5种预设风格+强度调节。")
+async def generate_styled_chapter(req: StyleGenerateRequest):
+    ctx = simulations.get(req.world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    # 自动提取上下文
+    world_context = req.world_context
+    story_context = req.story_context
+
+    if not world_context and ctx.world_state:
+        world_context = f"世界：{ctx.world_state.world_name}，时代：{ctx.world_state.era}，"
+        world_context += f"当前氛围：{ctx.world_state.world_mood}，"
+        world_context += f"地点：{', '.join(l.name for l in list(ctx.world_state.locations.values())[:5])}"
+
+    if not story_context and ctx.event_store:
+        recent = await ctx.event_store.query(limit=15)
+        story_context = "; ".join([
+            f"T{e.turn}: {e.actor_name} {e.action[:40]}" for e in recent
+        ])
+
+    # 确保LLM客户端可用
+    if not ctx.executor or not ctx.executor.llm_client:
+        raise HTTPException(status_code=400, detail="LLM client not available. Start simulation first.")
+
+    style_generator.set_llm(ctx.executor.llm_client)
+
+    config = StyleConfig(
+        style_name=req.style_name,
+        intensity=req.intensity,
+    )
+
+    result = await style_generator.generate(
+        world_context=world_context,
+        story_context=story_context,
+        config=config,
+        chapter_number=req.chapter_number,
+    )
+
+    return {"chapter": result.to_dict()}
+
+
+class TasteFeedbackRequest(BaseModel):
+    user_id: str = Field(..., description="用户ID")
+    chapter_id: str = Field("", description="章节ID")
+    accepted: bool = Field(..., description="是否采纳")
+    style_vector: Optional[Dict[str, float]] = Field(None, description="章节风格向量（12维）")
+
+
+@app.post("/api/users/{user_id}/taste/feedback", tags=["品味学习"], summary="G02 品味反馈", description="记录用户对生成章节的采纳/拒绝行为，更新审美偏好画像。")
+async def record_taste_feedback(user_id: str, req: TasteFeedbackRequest):
+    if not req.style_vector:
+        # 使用默认均衡向量
+        req.style_vector = {dim: 0.5 for dim in [
+            "pace", "density", "tension", "emotion_depth",
+            "description_richness", "dialogue_ratio", "inner_monologue",
+            "humor", "darkness", "poetry", "action_ratio", "world_detail",
+        ]}
+
+    profile = taste_encoder.record_feedback(
+        user_id=user_id,
+        chapter_style_vector=req.style_vector,
+        accepted=req.accepted,
+        chapter_id=req.chapter_id,
+    )
+
+    return {
+        "profile": profile.to_dict(),
+        "is_cold_start": profile.is_cold_start,
+        "dominant_style": profile.dominant_style() if not profile.is_cold_start else None,
+    }
+
+
+@app.get("/api/users/{user_id}/taste/profile", tags=["品味学习"], summary="G02 品味画像", description="获取用户的审美偏好画像，含12维偏好向量和品味漂移检测。")
+async def get_taste_profile(user_id: str):
+    profile = taste_encoder.get_or_create_profile(user_id)
+    return {
+        "profile": profile.to_dict(),
+        "is_cold_start": profile.is_cold_start,
+        "dominant_style": profile.dominant_style() if not profile.is_cold_start else None,
+    }
+
+
+class StyleBlendRequest(BaseModel):
+    user_id: Optional[str] = Field(None, description="用户ID（冷启动可省略）")
+    preset_name: str = Field("shuangwen", description="预设风格")
+    world_vector: Optional[Dict[str, float]] = Field(None, description="世界风格向量")
+    character_vector: Optional[Dict[str, float]] = Field(None, description="角色风格向量")
+
+
+@app.post("/api/style/blend", tags=["品味学习"], summary="G04 多风格混合", description="混合用户/世界/角色/预设四源风格向量，返回混合后的12维向量。")
+async def blend_style_vectors(req: StyleBlendRequest):
+    user_vec = None
+    if req.user_id:
+        profile = taste_encoder.get_or_create_profile(req.user_id)
+        user_vec = profile.vector
+
+    blended = style_generator.blend_vectors(
+        user_vector=user_vec,
+        world_vector=req.world_vector,
+        character_vector=req.character_vector,
+        preset_name=req.preset_name,
+    )
+
+    return {"blended_vector": blended, "preset_name": req.preset_name}
 
 
 if __name__ == "__main__":

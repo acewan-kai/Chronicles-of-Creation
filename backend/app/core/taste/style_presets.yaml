@@ -1,0 +1,165 @@
+# G04 风格预设包 — 5种中文小说风格
+# 冷启动阶段使用，用户数据积累后切换私人模型
+#
+# 每个预设包含:
+#   vector: 风格向量 (12维度, 0-1)
+#   prompt_template: 章节生成提示词模板
+#   intensity_levels: 强度档位 (0-100 映射到具体参数)
+
+presets:
+  shuangwen:
+    name: "网文爽文"
+    description: "快节奏高爽感，主角强势碾压，金手指频出"
+    vector:
+      pace: 0.9
+      density: 0.85
+      tension: 0.8
+      emotion_depth: 0.3
+      description_richness: 0.4
+      dialogue_ratio: 0.5
+      inner_monologue: 0.2
+      humor: 0.4
+      darkness: 0.2
+      poetry: 0.1
+      action_ratio: 0.7
+      world_detail: 0.3
+    prompt_template: |
+      你是顶级网文作者。按以下风格写一章（800-1200字）：
+      - 节奏：极快，每段推进剧情，拒绝拖沓
+      - 文风：直白爽利，少用修饰，多用短句和动作描写
+      - 爽点：主角展现实力碾压，获得意想不到的收获或认可
+      - 对话：干脆利落，每句话推动剧情
+      - 情感：适度渲染但不拖沓
+
+      世界观背景：{world_context}
+      当前剧情：{story_context}
+      风格强度：{intensity}%（0=自然, 100=极致爽文）
+
+      直接输出章节正文：
+
+  lean:
+    name: "冷峻白描"
+    description: "鲁迅式克制笔法，白描见骨，留白多"
+    vector:
+      pace: 0.4
+      density: 0.6
+      tension: 0.5
+      emotion_depth: 0.7
+      description_richness: 0.5
+      dialogue_ratio: 0.3
+      inner_monologue: 0.5
+      humor: 0.15
+      darkness: 0.6
+      poetry: 0.3
+      action_ratio: 0.3
+      world_detail: 0.4
+    prompt_template: |
+      你是严肃文学作家。按以下风格写一章（800-1200字）：
+      - 节奏：沉稳克制，让情节自然展开
+      - 文风：白描为主，不渲染不煽情，用事实和细节说话
+      - 对话：简短含蓄，言外之意多于字面
+      - 情感：隐藏在动作和细节中，不直抒胸臆
+      - 留白：重要的不写尽，给读者想象空间
+
+      世界观背景：{world_context}
+      当前剧情：{story_context}
+      风格强度：{intensity}%
+
+      直接输出章节正文：
+
+  hot_blood:
+    name: "热血战记"
+    description: "少年漫式燃系叙事，战斗场面华丽，兄弟情义"
+    vector:
+      pace: 0.75
+      density: 0.8
+      tension: 0.9
+      emotion_depth: 0.6
+      description_richness: 0.5
+      dialogue_ratio: 0.55
+      inner_monologue: 0.4
+      humor: 0.3
+      darkness: 0.4
+      poetry: 0.2
+      action_ratio: 0.85
+      world_detail: 0.5
+    prompt_template: |
+      你是热血战斗小说作者。按以下风格写一章（800-1200字）：
+      - 节奏：燃！战斗场面逐帧推进，拳拳到肉
+      - 文风：充满力量的短句，拟声词和动作感强烈
+      - 情感：兄弟情义、不屈意志、绝境爆发
+      - 对话：掷地有声的宣言和呐喊
+      - 核心：永不放弃的精神贯穿始终
+
+      世界观背景：{world_context}
+      当前剧情：{story_context}
+      风格强度：{intensity}%
+
+      直接输出章节正文：
+
+  romance:
+    name: "缠绵言情"
+    description: "细腻情感描写，心理活动丰富，氛围唯美"
+    vector:
+      pace: 0.35
+      density: 0.5
+      tension: 0.5
+      emotion_depth: 0.95
+      description_richness: 0.8
+      dialogue_ratio: 0.6
+      inner_monologue: 0.85
+      humor: 0.2
+      darkness: 0.3
+      poetry: 0.7
+      action_ratio: 0.15
+      world_detail: 0.5
+    prompt_template: |
+      你是言情小说作家。按以下风格写一章（800-1200字）：
+      - 节奏：缓慢细腻，每一个眼神和动作都有重量
+      - 文风：优美动人，善用比喻和意象渲染情感
+      - 情感：深入人物内心，展现复杂真挚的情感变化
+      - 对话：自然含蓄，言在此而意在彼
+      - 氛围：唯美浪漫，场景描写烘托情感基调
+
+      世界观背景：{world_context}
+      当前剧情：{story_context}
+      风格强度：{intensity}%
+
+      直接输出章节正文：
+
+  hardcore:
+    name: "硬核世界观"
+    description: "马丁式严谨叙事，设定逻辑自洽，政治博弈"
+    vector:
+      pace: 0.5
+      density: 0.9
+      tension: 0.7
+      emotion_depth: 0.6
+      description_richness: 0.9
+      dialogue_ratio: 0.45
+      inner_monologue: 0.5
+      humor: 0.2
+      darkness: 0.8
+      poetry: 0.3
+      action_ratio: 0.4
+      world_detail: 0.95
+    prompt_template: |
+      你是史诗奇幻作家（参考乔治·R·R·马丁风格）。按以下风格写一章（800-1200字）：
+      - 节奏：多线并行，政治博弈与个人命运交织
+      - 文风：严谨详实，世界设定有据可循
+      - 情感：角色在道德灰色地带挣扎，每个选择都有代价
+      - 对话：充满权谋和潜台词的对话
+      - 细节：世界运行的规则清晰可见，经济/政治/文化逻辑自洽
+
+      世界观背景：{world_context}
+      当前剧情：{story_context}
+      风格强度：{intensity}%
+
+      直接输出章节正文：
+
+# 默认混合权重（用户未配置时使用）
+default_blend:
+  user_weight: 0.0       # 用户偏好（冷启动为0）
+  world_weight: 0.4      # 世界模板推荐风格
+  character_weight: 0.3  # 角色视角风格
+  preset_weight: 0.3     # 预设风格包

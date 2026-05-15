@@ -288,4 +288,20 @@ export const api = {
     const response = await axios.get(`${API_BASE}/worlds/${worldId}/snapshots/${snapshotId}`);
     return response.data.snapshot;
   },
+
+  // G04: 获取风格预设列表
+  async getStylePresets(): Promise<any[]> {
+    const response = await axios.get(`${API_BASE}/style/presets`);
+    return response.data.presets || [];
+  },
+
+  // G04: 生成风格化章节
+  async generateStyledChapter(worldId: string, styleName: string, intensity: number): Promise<any> {
+    const response = await axios.post(`${API_BASE}/style/generate`, {
+      world_id: worldId,
+      style_name: styleName,
+      intensity,
+    });
+    return response.data;
+  },
 };
