@@ -185,13 +185,16 @@ def create_llm_client(mode: str = "auto") -> tuple[Any, str]:
     """根据环境变量创建LLM客户端（多Provider统一接口）
 
     支持Provider:
-    - deepseek, openai, kimi, minimax, zhipu, qwen, hunyuan, doubao, custom, mock
+    - deepseek, openai, kimi, minimax, zhipu, qwen, hunyuan, doubao, custom, mock, auto
     - 别名: xiaomi/xiaoai → deepseek; moonshot → kimi; glm → zhipu; etc.
+    - auto: 自动检测可用的API Key
 
     Returns:
         (client, provider_name)
     """
     factory = LLMClientFactory()
+    if mode == "auto":
+        return factory.create_auto()
     return factory.create(mode)
 
 
@@ -235,8 +238,16 @@ def get_llm_cost_estimate(mode_name: str, turn_count: int, npc_count: int) -> di
 # ── 请求模型 ─────────────────────────────────────────────
 class CreateWorldRequest(BaseModel):
     name: str = Field(..., description="世界名称，如'测试修仙世界'")
-    template: str = Field(..., description="模板ID，可选: cultivation(修仙), wuxia(武侠), urban(都市奇幻)")
-    description: Optional[str] = Field("", description="世界描述（可选）")
+    template: str = Field(..., description="模板ID，可选: cultivation(修仙), wuxia(武侠), urban(都市奇幻), generate(智能生成)")
+    description: Optional[str] = Field("", description="世界描述/关键词（template=generate时用于智能生成）")
+    generated: Optional[Dict[str, Any]] = Field(None, description="智能生成的世界配置（template=custom时使用）")
+
+
+class WorldGenerateRequest(BaseModel):
+    name: str = Field(..., description="世界名称，如'都市异能世界'")
+    description: str = Field(..., description="世界描述/关键词，如'现代都市中隐藏着异能者和妖怪，他们在暗中维持秩序'")
+    npc_count: int = Field(10, description="NPC数量（5-20，默认10）")
+    location_count: int = Field(8, description="地点数量（5-15，默认8）")
 
 
 class CreateBookRequest(BaseModel):
@@ -529,8 +540,15 @@ TEMPLATE_WORLDS = {
 }
 
 
-async def _init_world_simulation(world_id: str, template_id: str, world_name: str):
-    """初始化世界的模拟上下文"""
+async def _init_world_simulation(world_id: str, template_id: str, world_name: str, generated: Optional[Dict] = None):
+    """初始化世界的模拟上下文
+
+    Args:
+        world_id: 世界ID
+        template_id: 模板ID (cultivation/wuxia/urban) 或 'generate'/'custom'
+        world_name: 世界名称
+        generated: 智能生成的世界配置（template_id为generate/custom时使用）
+    """
     ctx = SimulationContext(world_id)
 
     # 事件存储
@@ -556,8 +574,11 @@ async def _init_world_simulation(world_id: str, template_id: str, world_name: st
     ctx.consistency_guardian = ConsistencyGuardian(world_id)
     ctx.descend_manager = DescendManager(world_id)
 
-    # 世界状态
-    template = TEMPLATE_WORLDS.get(template_id, TEMPLATE_WORLDS["cultivation"])
+    # 世界状态 — 支持智能生成配置
+    if generated and isinstance(generated, dict):
+        template = generated
+    else:
+        template = TEMPLATE_WORLDS.get(template_id, TEMPLATE_WORLDS["cultivation"])
     ctx.world_state = WorldState(
         world_id=world_id,
         world_name=world_name,
@@ -1083,17 +1104,168 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
         })
 
 
+async def _generate_world_from_llm(name: str, description: str, npc_count: int, location_count: int) -> dict:
+    """使用LLM智能生成世界内容（NPC/地点/关系/事件）"""
+    llm_client, llm_mode = create_llm_client(os.getenv("LLM_MODE", "auto"))
+
+    # 限制数量
+    npc_count = max(5, min(npc_count, 20))
+    location_count = max(5, min(location_count, 15))
+
+    # 中国主要城市的经纬度
+    city_coords = [
+        (31.2304, 121.4737),  # 上海
+        (39.9042, 116.4074),  # 北京
+        (23.1291, 113.2644),  # 广州
+        (30.5728, 104.0668),  # 成都
+        (22.5431, 114.0579),  # 深圳
+        (34.3416, 108.9398),  # 西安
+        (30.2741, 120.1551),  # 杭州
+        (32.0603, 118.7969),  # 南京
+    ]
+
+    prompt = f"""你是一个小说世界观设计师。请根据用户输入，生成一个完整的世界设定。
+
+【世界名称】{name}
+【世界描述】{description or '由你自由发挥，创造一个独特的世界'}
+【要求】
+- NPC数量: {npc_count}个
+- 地点数量: {location_count}个
+- 初始关系: 5-10个
+- 活跃事件: 3-5个
+
+请严格按照以下JSON格式输出（不要输出其他内容，只输出JSON）：
+
+```json
+{{
+  "era": "世界时代/背景的一句话描述（如'赛博朋克2077'、'盛唐时期'、'末日废土'）",
+  "locations": [
+    {{"id": "loc_1", "name": "地点名", "desc": "一句话描述", "lat": 纬度数字, "lng": 经度数字}}
+  ],
+  "agents": [
+    {{"id": "npc_1", "name": "角色名", "identity": "身份", "personality": "性格特征（8-15字）"}}
+  ],
+  "initial_relationships": [
+    {{"a": "npc_1", "b": "npc_2", "type": "关系类型（如朋友/师徒/敌对/暗恋/合作/亲属）", "weight": 0.1到1.0之间的数字}}
+  ],
+  "active_events": [
+    "当前世界正在发生的事件描述"
+  ]
+}}
+```
+
+【注意事项】
+1. 角色名字要有文化特色，身份和性格要多样化，形成戏剧冲突
+2. 地点要有层次感，覆盖不同功能（如居所/商业/权力/秘境等）
+3. 关系网络要形成三角或多角关系，有正面也有负面
+4. 经纬度请使用中国城市的真实经纬度（参考：上海31.23/121.47, 北京39.90/116.41, 广州23.13/113.26, 成都30.57/104.07, 深圳22.54/114.06, 西安34.34/108.94, 杭州30.27/120.16, 南京32.06/118.80），根据世界风格选择合适城市并做微调
+5. 只输出JSON，不要有任何额外文字"""
+
+    try:
+        content = await llm_client.generate(
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.9,
+            max_tokens=3000,
+        )
+
+        if not content:
+            raise ValueError("LLM returned empty response")
+
+        # 提取JSON（可能被```json包裹）
+        json_str = content.strip()
+        if json_str.startswith("```"):
+            json_str = json_str.split("\n", 1)[1] if "\n" in json_str else json_str[3:]
+            if json_str.endswith("```"):
+                json_str = json_str[:-3]
+            json_str = json_str.strip()
+            # 去掉可能的 ```json 开头
+            if json_str.startswith("json"):
+                json_str = json_str[4:].strip()
+
+        import json
+        world_data = json.loads(json_str)
+
+        # 补全ID（确保唯一）
+        for i, loc in enumerate(world_data.get("locations", [])):
+            loc["id"] = loc.get("id", f"loc_{i+1}")
+        for i, agent in enumerate(world_data.get("agents", [])):
+            agent["id"] = agent.get("id", f"npc_{i+1}")
+
+        # 强制修正坐标范围（中国境内）
+        for loc in world_data.get("locations", []):
+            lat = loc.get("lat", 0)
+            lng = loc.get("lng", 0)
+            if not (18 <= lat <= 54):
+                loc["lat"] = 31.23 + (hash(loc["name"]) % 100) * 0.08
+            if not (73 <= lng <= 135):
+                loc["lng"] = 121.47 + (hash(loc["name"]) % 100) * 0.06
+            loc["lat"] = round(loc["lat"], 4)
+            loc["lng"] = round(loc["lng"], 4)
+
+        return world_data
+
+    except Exception as e:
+        # LLM生成失败时，根据描述关键词fallback到合适模板
+        desc_lower = (name + description).lower()
+        if any(kw in desc_lower for kw in ["都市", "城市", "现代", "事务所", "灵异"]):
+            fallback = TEMPLATE_WORLDS["urban"]
+        elif any(kw in desc_lower for kw in ["武侠", "江湖", "武林"]):
+            fallback = TEMPLATE_WORLDS["wuxia"]
+        else:
+            fallback = TEMPLATE_WORLDS["cultivation"]
+        # 返回模板数据
+        return {
+            "era": fallback["era"],
+            "locations": fallback["locations"],
+            "agents": fallback["agents"],
+            "initial_relationships": fallback.get("initial_relationships", []),
+            "active_events": fallback.get("active_events", []),
+        }
+
+
+@app.post("/api/worlds/generate", tags=["世界管理"], summary="智能生成世界", description="根据名称和描述，用LLM智能生成完整世界设定（NPC/地点/关系/事件）。创建前预览。")
+async def generate_world(req: WorldGenerateRequest):
+    if not req.name.strip():
+        raise HTTPException(status_code=400, detail="世界名称不能为空")
+
+    world_data = await _generate_world_from_llm(
+        name=req.name.strip(),
+        description=req.description.strip(),
+        npc_count=req.npc_count,
+        location_count=req.location_count,
+    )
+
+    return {
+        "name": req.name,
+        "description": req.description,
+        "generated": world_data,
+    }
+
+
 @app.get("/api/worlds", tags=["世界管理"], summary="获取世界列表", description="返回所有已创建的世界。**测试第三步前置**：确认已创建的世界及其ID。")
 async def list_worlds():
     return {"worlds": list(worlds_db.values())}
 
 
-@app.post("/api/worlds", tags=["世界管理"], summary="创建新世界", description="用指定模板创建世界，自动初始化10个NPC、8个地点、角色关系图。请求体字段：name(世界名称,必填)、template(模板ID,必填,可选cultivation/wuxia/urban)。**测试第三步**：创建后得到world_id用于后续步骤。")
+@app.post("/api/worlds", tags=["世界管理"], summary="创建新世界", description="用指定模板创建世界，自动初始化10个NPC、8个地点、角色关系图。template设为'generate'时根据description用LLM智能生成世界。")
 async def create_world(req: CreateWorldRequest):
     world_id = str(uuid.uuid4())[:8]
 
-    # 初始化模拟上下文(模板中创建世界状态+智能体等)
-    await _init_world_simulation(world_id, req.template, req.name)
+    # 处理智能生成或自定义配置
+    generated = req.generated
+    template_id = req.template
+
+    if template_id == "generate" and not generated:
+        # LLM智能生成
+        generated = await _generate_world_from_llm(
+            name=req.name,
+            description=req.description or "",
+            npc_count=10,
+            location_count=8,
+        )
+
+    # 初始化模拟上下文
+    await _init_world_simulation(world_id, template_id, req.name, generated)
 
     world = World(
         id=world_id,

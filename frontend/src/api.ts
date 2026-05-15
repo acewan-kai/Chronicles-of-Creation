@@ -192,11 +192,22 @@ export const api = {
     return response.data;
   },
 
+  // 智能生成世界
+  async generateWorld(name: string, description: string): Promise<any> {
+    const response = await axios.post(`${API_BASE}/worlds/generate`, {
+      name,
+      description,
+    });
+    return response.data;
+  },
+
   // 创建世界
-  async createWorld(name: string, template: string) {
+  async createWorld(name: string, template: string, description?: string, generated?: any) {
     const response = await axios.post(`${API_BASE}/worlds`, {
       name,
-      template
+      template,
+      description: description || '',
+      generated: generated || null,
     });
     return response.data;
   },

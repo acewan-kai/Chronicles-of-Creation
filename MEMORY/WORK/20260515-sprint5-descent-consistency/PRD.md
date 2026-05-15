@@ -2,7 +2,7 @@
 task: Sprint 5 — 降临模式(F04) + 角色一致性守护(C02)
 slug: 20260515-sprint5-descent-consistency
 effort: Advanced
-phase: execute
+phase: complete
 progress: 26/26
 mode: ALGORITHM
 started: 2026-05-15T18:10:00
