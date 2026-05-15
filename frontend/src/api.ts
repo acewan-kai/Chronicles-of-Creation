@@ -60,6 +60,31 @@ export interface Location {
   id: string;
   name: string;
   description: string;
+  lat?: number;
+  lng?: number;
+}
+
+export interface NpcPosition {
+  agent_id: string;
+  agent_name: string;
+  identity?: string;
+  location_id: string;
+  location_name: string;
+  lat: number;
+  lng: number;
+  is_alive: boolean;
+}
+
+export interface Snapshot {
+  id: string;
+  world_id: string;
+  turn: number;
+  day: number;
+  time_of_day: string;
+  world_mood: string;
+  event_summary: string;
+  npc_positions: NpcPosition[];
+  created_at: string;
 }
 
 export interface GraphEdge {
@@ -117,8 +142,10 @@ export interface HealthCheck {
 }
 
 // WebSocket 消息类型
+export type WsEventType = 'NEW_EVENT' | 'TURN_COMPLETE' | 'STATUS_CHANGE' | 'DISTURBANCE' | 'STAGNATION_ALERT' | 'NPC_POSITION';
+
 export interface WsMessage {
-  type: 'NEW_EVENT' | 'TURN_COMPLETE' | 'STATUS_CHANGE';
+  type: WsEventType;
   data: any;
 }
 
@@ -234,5 +261,31 @@ export const api = {
       params: { world_id: worldId }
     });
     return response.data;
+  },
+
+  // F02: 获取NPC位置（含坐标）
+  async getNpcLocations(worldId: string): Promise<NpcPosition[]> {
+    const response = await axios.get(`${API_BASE}/worlds/${worldId}/npc-locations`);
+    return response.data.npcs || [];
+  },
+
+  // F03: 保存快照
+  async saveSnapshot(worldId: string): Promise<Snapshot> {
+    const response = await axios.post(`${API_BASE}/worlds/${worldId}/snapshots`);
+    return response.data.snapshot;
+  },
+
+  // F03: 获取快照列表
+  async getSnapshots(worldId: string, limit = 20): Promise<Snapshot[]> {
+    const response = await axios.get(`${API_BASE}/worlds/${worldId}/snapshots`, {
+      params: { limit }
+    });
+    return response.data.snapshots || [];
+  },
+
+  // F03: 获取单个快照
+  async getSnapshot(worldId: string, snapshotId: string): Promise<Snapshot> {
+    const response = await axios.get(`${API_BASE}/worlds/${worldId}/snapshots/${snapshotId}`);
+    return response.data.snapshot;
   },
 };

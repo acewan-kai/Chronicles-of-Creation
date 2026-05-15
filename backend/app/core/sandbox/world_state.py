@@ -26,6 +26,8 @@ class Location:
     id: str
     name: str
     description: str
+    lat: float = 0.0
+    lng: float = 0.0
     npcs: List[str] = field(default_factory=list)
     properties: Dict = field(default_factory=dict)
     mood_modifier: float = 1.0  # 氛围修正因子
@@ -156,6 +158,8 @@ class WorldState:
                     "id": v.id,
                     "name": v.name,
                     "description": v.description,
+                    "lat": v.lat,
+                    "lng": v.lng,
                     "npcs": v.npcs,
                     "properties": v.properties
                 }

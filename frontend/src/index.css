@@ -1301,3 +1301,348 @@ body {
   background: #fce4ec;
   color: #c62828;
 }
+
+/* ── F03 TimelineControls ────────────────────────────────── */
+.timeline-controls {
+  padding: 1rem;
+  background: var(--surface);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.timeline-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.timeline-header-bar h3 {
+  font-size: 1rem;
+}
+
+.timeline-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.speed-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.speed-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-right: 0.25rem;
+}
+
+.btn-xs {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-xs:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btn-xs.btn-active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.timeline-slider {
+  cursor: pointer;
+  margin-bottom: 1rem;
+  user-select: none;
+}
+
+.timeline-track {
+  position: relative;
+  height: 32px;
+  background: linear-gradient(to bottom, #e8e8e8, #f0f0f0);
+  border-radius: 4px;
+  overflow: visible;
+}
+
+.timeline-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(76, 175, 80, 0.3), rgba(76, 175, 80, 0.15));
+  border-radius: 4px;
+  transition: width 0.3s;
+  pointer-events: none;
+}
+
+.timeline-event-marker {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  background: var(--secondary);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.timeline-event-marker:hover {
+  transform: translate(-50%, -50%) scale(1.5);
+  background: var(--accent);
+}
+
+.timeline-playhead {
+  position: absolute;
+  top: -4px;
+  transform: translateX(-50%);
+  z-index: 3;
+  transition: left 0.3s;
+}
+
+.playhead-dot {
+  width: 12px;
+  height: 12px;
+  background: var(--danger);
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.timeline-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.timeline-event-detail {
+  background: var(--background);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.detail-count {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.detail-item {
+  font-size: 0.8rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.detail-actor {
+  font-weight: 600;
+  color: var(--primary-dark);
+  white-space: nowrap;
+}
+
+.detail-action {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-target {
+  color: var(--secondary);
+  font-size: 0.75rem;
+}
+
+/* Snapshot Panel */
+.snapshot-list-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.snapshot-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.snapshot-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.snapshot-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.snapshot-item:hover {
+  background: var(--background);
+}
+
+.snap-turn {
+  font-weight: 600;
+  color: var(--primary);
+  min-width: 40px;
+}
+
+.snap-time {
+  color: var(--text-secondary);
+  min-width: 90px;
+}
+
+.snap-mood {
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+
+.empty-text {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  padding: 1rem;
+}
+
+/* ── F02 WorldMap ────────────────────────────────────────── */
+.world-map-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.map-layer-controls {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 1000;
+}
+
+.map-npc-count {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.leaflet-map {
+  flex: 1;
+  min-height: 400px;
+  z-index: 1;
+}
+
+.map-popup {
+  min-width: 120px;
+}
+
+.map-popup strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.map-popup p {
+  margin: 0.15rem 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.npc-identity {
+  font-style: italic;
+  color: var(--secondary);
+}
+
+.npc-location {
+  font-size: 0.8rem;
+}
+
+.npc-status.alive {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.npc-status.dead {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+/* NPC Detail Sidebar */
+.npc-detail-sidebar {
+  position: absolute;
+  right: 0;
+  top: 42px;
+  width: 220px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  padding: 1rem;
+  z-index: 1000;
+  box-shadow: var(--shadow-lg);
+  animation: slideInRight 0.2s ease;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.npc-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.npc-detail-identity {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  font-style: italic;
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.npc-map-icon, .location-map-icon {
+  background: none !important;
+  border: none !important;
+}

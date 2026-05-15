@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { WorldGraph } from './components/WorldGraph';
 import { EventTimeline } from './components/EventTimeline';
+import { TimelineControls } from './components/TimelineControls';
+import { WorldMap } from './components/WorldMap';
 import { AgentList } from './components/AgentList';
 import { MetricsPanel } from './components/MetricsPanel';
 import { OnboardingGuide } from './components/OnboardingGuide';
 import { CreateWorldModal } from './components/CreateWorldModal';
-import { api, connectWebSocket, World, Event, Agent, Location, WsMessage } from './api';
+import { api, connectWebSocket, World, Event, Agent, Location, NpcPosition, WsMessage } from './api';
 
 function App() {
   const [worldId, setWorldId] = useState<string>('');
   const [worlds, setWorlds] = useState<World[]>([]);
-  const [activeTab, setActiveTab] = useState<'graph' | 'timeline'>('graph');
+  const [activeTab, setActiveTab] = useState<'graph' | 'timeline' | 'map' | 'timeline-controls'>('graph');
   const [isSimulating, setIsSimulating] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
@@ -19,6 +21,7 @@ function App() {
   const [apiVersion, setApiVersion] = useState<string>('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [worldData, setWorldData] = useState<World | null>(null);
+  const [npcPositions, setNpcPositions] = useState<NpcPosition[]>([]);
 
   // 加载世界列表
   useEffect(() => {
@@ -78,6 +81,10 @@ function App() {
             agents: msg.data.agents,
             graph_edges: msg.data.graph_edges,
           }));
+          break;
+        }
+        case 'NPC_POSITION': {
+          setNpcPositions(msg.data.npcs || []);
           break;
         }
         case 'STATUS_CHANGE': {
@@ -242,28 +249,55 @@ function App() {
 
         <div className="content">
           <nav className="tab-nav">
-            <button 
+            <button
               className={`tab-btn ${activeTab === 'graph' ? 'active' : ''}`}
               onClick={() => setActiveTab('graph')}
             >
               世界图谱
             </button>
-            <button 
+            <button
+              className={`tab-btn ${activeTab === 'timeline-controls' ? 'active' : ''}`}
+              onClick={() => setActiveTab('timeline-controls')}
+            >
+              时间线
+            </button>
+            <button
               className={`tab-btn ${activeTab === 'timeline' ? 'active' : ''}`}
               onClick={() => setActiveTab('timeline')}
             >
-              事件时间线
+              事件列表
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'map' ? 'active' : ''}`}
+              onClick={() => setActiveTab('map')}
+            >
+              世界地图
             </button>
           </nav>
 
           <div className="tab-content">
-            {events.length === 0 && !isSimulating ? (
+            {events.length === 0 && !isSimulating && activeTab !== 'map' ? (
               <OnboardingGuide onStart={startSimulation} />
             ) : activeTab === 'graph' ? (
               <WorldGraph
                 worldData={worldData}
                 events={events}
                 isSimulating={isSimulating}
+              />
+            ) : activeTab === 'timeline-controls' ? (
+              <TimelineControls
+                events={events}
+                currentTurn={metrics?.current_turn ?? 0}
+                worldId={worldId}
+                isSimulating={isSimulating}
+              />
+            ) : activeTab === 'map' ? (
+              <WorldMap
+                worldId={worldId}
+                locations={worldData?.locations || []}
+                events={events}
+                isSimulating={isSimulating}
+                npcPositions={npcPositions}
               />
             ) : (
               <EventTimeline events={events} />

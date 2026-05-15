@@ -2,7 +2,7 @@
 P0 MVP - FastAPI 主入口 (集成core模块)
 """
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -37,9 +37,16 @@ from app.core.scoring.behavior_evaluator import BehaviorEvaluator, EvalTracker
 from app.core.sandbox.narrative_extractor import NarrativeExtractor
 from app.core.sandbox.story_sifter import StorySifter
 from app.core.sandbox.conflict_injector import ConflictInjector, ConflictType
+from app.core.sandbox.stagnation_detector import StagnationDetector, StagnationReport
+from app.core.sandbox.disturbance_injector import DisturbanceInjector, DisturbanceEvent, Frequency
 from app.core.sandbox.multi_llm_client import LLMClientFactory, MultiLLMClient, LLMProvider
 from app.core.usage_tracker import UsageTracker
 from app.core.onboarding import OnboardingGuide
+from app.core.db import Database
+from app.core.auth import (
+    hash_password, verify_password, create_token,
+    get_current_user_id, require_user_id,
+)
 
 # 加载项目根目录 .env（兼容本地/服务器两种路径层级）
 _env_path = Path(__file__).resolve().parent.parent / '.env'   # 服务器: ~/p0-mvp-backend/.env
@@ -114,6 +121,22 @@ scorer = AestheticScorer()
 DATA_DIR = Path(os.getenv("DATA_DIR", "./data"))
 DATA_DIR.mkdir(exist_ok=True)
 
+# ── 数据库 ────────────────────────────────────────────────
+db = Database(DATA_DIR / "platform.db")
+
+
+@app.on_event("startup")
+async def startup():
+    """启动时初始化数据库，从SQLite恢复持久化数据"""
+    await db.initialize()
+
+    # 从数据库恢复世界和书籍数据到内存缓存
+    for w in await db.list_worlds():
+        worlds_db[w["id"]] = w
+    for b in await db.list_books():
+        books_db[b["id"]] = b
+    print(f"[DB] 恢复 {len(worlds_db)} 个世界, {len(books_db)} 本书")
+
 
 class SimulationContext:
     """世界模拟上下文——绑定所有运行时组件"""
@@ -134,6 +157,8 @@ class SimulationContext:
         self.behavior_evaluator: Optional[BehaviorEvaluator] = None
         self.dialogue_manager: Optional[DialogueManager] = None
         self.conflict_injector: Optional[ConflictInjector] = None
+        self.stagnation_detector: Optional[StagnationDetector] = None
+        self.disturbance_injector: Optional[DisturbanceInjector] = None
         self._sim_task: Optional[asyncio.Task] = None
         self._running: bool = False
 
@@ -211,6 +236,17 @@ class CreateBookRequest(BaseModel):
     description: Optional[str] = Field("", description="小说简介（可选）")
     genre: Optional[str] = Field("", description="小说类型，如'玄幻'、'都市'（可选）")
     target_audience: Optional[str] = Field("", description="目标读者，如'男性向'、'女性向'（可选）")
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=2, max_length=32, description="用户名")
+    email: str = Field(..., description="邮箱")
+    password: str = Field(..., min_length=6, description="密码")
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., description="用户名")
+    password: str = Field(..., description="密码")
 
 
 class World(BaseModel):
@@ -306,6 +342,7 @@ async def create_book(req: CreateBookRequest):
         status="draft"
     )
     books_db[book_id] = book.model_dump()
+    await db.save_book(book.model_dump())
     return {"book": book.model_dump()}
 
 
@@ -314,6 +351,57 @@ async def get_book(book_id: str):
     if book_id not in books_db:
         raise HTTPException(status_code=404, detail="Book not found")
     return books_db[book_id]
+
+
+# ═══════════════════════════════════════════════════════════
+# 用户认证
+# ═══════════════════════════════════════════════════════════
+
+@app.post("/api/auth/register", tags=["用户认证"], summary="用户注册", description="注册新用户，返回JWT Token。字段：username(用户名)、email(邮箱)、password(密码)。")
+async def register(req: RegisterRequest):
+    existing = await db.get_user_by_username(req.username)
+    if existing:
+        raise HTTPException(status_code=409, detail="用户名已存在")
+    existing_email = await db.get_user_by_email(req.email)
+    if existing_email:
+        raise HTTPException(status_code=409, detail="邮箱已注册")
+
+    user_id = str(uuid.uuid4())[:8]
+    user = {
+        "id": user_id,
+        "username": req.username,
+        "email": req.email,
+        "password_hash": hash_password(req.password),
+        "created_at": datetime.now().isoformat(),
+    }
+    await db.save_user(user)
+    token = create_token(user_id, req.username)
+    return {"user_id": user_id, "username": req.username, "token": token}
+
+
+@app.post("/api/auth/login", tags=["用户认证"], summary="用户登录", description="用户名密码登录，返回JWT Token。")
+async def login(req: LoginRequest):
+    user = await db.get_user_by_username(req.username)
+    if not user or not verify_password(req.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+
+    await db.update_user_login(user["id"])
+    token = create_token(user["id"], user["username"])
+    return {"user_id": user["id"], "username": user["username"], "token": token}
+
+
+@app.get("/api/auth/me", tags=["用户认证"], summary="当前用户信息", description="获取当前登录用户的信息（需Bearer Token）。")
+async def get_me(user_id: str = Depends(require_user_id)):
+    user = await db.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "email": user["email"],
+        "created_at": user["created_at"],
+        "last_login": user.get("last_login"),
+    }
 
 
 # ═══════════════════════════════════════════════════════════
@@ -326,14 +414,14 @@ TEMPLATE_WORLDS = {
         "name": "青云仙门",
         "era": "修仙纪元",
         "locations": [
-            {"id": "main_peak", "name": "主峰大殿", "desc": "青云宗最高议事之所，灵气最为浓郁"},
-            {"id": "training_hall", "name": "练功堂", "desc": "弟子日常修炼之地，功法典籍满架"},
-            {"id": "alchemy_lab", "name": "炼丹房", "desc": "丹师炼制丹药处，炉火常年不熄"},
-            {"id": "sword_cliff", "name": "剑崖", "desc": "宗门禁地，剑气环绕，传闻藏有上古剑诀"},
-            {"id": "guest_pavilion", "name": "迎客亭", "desc": "接待外客之所，可俯瞰云海"},
-            {"id": "spirit_spring", "name": "灵泉洞", "desc": "地下灵泉涌出之处，修炼速度翻倍"},
-            {"id": "punishment_hall", "name": "戒律堂", "desc": "惩戒违规弟子之所，气氛森严"},
-            {"id": "beast_forest", "name": "妖兽林", "desc": "后山密林，妖兽横行，历练之地"},
+            {"id": "main_peak", "name": "主峰大殿", "desc": "青云宗最高议事之所，灵气最为浓郁", "lat": 34.0522, "lng": 118.2437},
+            {"id": "training_hall", "name": "练功堂", "desc": "弟子日常修炼之地，功法典籍满架", "lat": 34.0480, "lng": 118.2460},
+            {"id": "alchemy_lab", "name": "炼丹房", "desc": "丹师炼制丹药处，炉火常年不熄", "lat": 34.0500, "lng": 118.2410},
+            {"id": "sword_cliff", "name": "剑崖", "desc": "宗门禁地，剑气环绕，传闻藏有上古剑诀", "lat": 34.0560, "lng": 118.2400},
+            {"id": "guest_pavilion", "name": "迎客亭", "desc": "接待外客之所，可俯瞰云海", "lat": 34.0490, "lng": 118.2480},
+            {"id": "spirit_spring", "name": "灵泉洞", "desc": "地下灵泉涌出之处，修炼速度翻倍", "lat": 34.0540, "lng": 118.2380},
+            {"id": "punishment_hall", "name": "戒律堂", "desc": "惩戒违规弟子之所，气氛森严", "lat": 34.0460, "lng": 118.2450},
+            {"id": "beast_forest", "name": "妖兽林", "desc": "后山密林，妖兽横行，历练之地", "lat": 34.0580, "lng": 118.2500},
         ],
         "agents": [
             {"id": "master_qingxu", "name": "清虚真人", "identity": "青云宗掌门", "personality": "威严刚正，剑道通神"},
@@ -362,14 +450,14 @@ TEMPLATE_WORLDS = {
         "name": "江湖风云录",
         "era": "明末乱世",
         "locations": [
-            {"id": "inn", "name": "悦来客栈", "desc": "江湖消息集散地，三教九流汇聚"},
-            {"id": "shaolin", "name": "少林寺", "desc": "武林泰山北斗，七十二绝技之源"},
-            {"id": "wudang", "name": "武当山", "desc": "道家武学圣地，太极剑法发祥地"},
-            {"id": "gov_office", "name": "知府衙门", "desc": "朝廷势力据点，管辖一方治安"},
-            {"id": "black_market", "name": "黑市", "desc": "见不得光的交易场，暗器毒药流通"},
-            {"id": "emei", "name": "峨眉派", "desc": "女子剑法名门，倚天剑镇派之宝"},
-            {"id": "beggar_den", "name": "丐帮总舵", "desc": "天下第一大帮，消息最灵通之处"},
-            {"id": "river_dock", "name": "长江渡口", "desc": "南北水运枢纽，商贾云集"},
+            {"id": "inn", "name": "悦来客栈", "desc": "江湖消息集散地，三教九流汇聚", "lat": 34.0522, "lng": 118.2437},
+            {"id": "shaolin", "name": "少林寺", "desc": "武林泰山北斗，七十二绝技之源", "lat": 34.5100, "lng": 112.4700},
+            {"id": "wudang", "name": "武当山", "desc": "道家武学圣地，太极剑法发祥地", "lat": 32.4000, "lng": 111.0000},
+            {"id": "gov_office", "name": "知府衙门", "desc": "朝廷势力据点，管辖一方治安", "lat": 34.0550, "lng": 118.2400},
+            {"id": "black_market", "name": "黑市", "desc": "见不得光的交易场，暗器毒药流通", "lat": 34.0480, "lng": 118.2480},
+            {"id": "emei", "name": "峨眉派", "desc": "女子剑法名门，倚天剑镇派之宝", "lat": 29.5200, "lng": 103.3300},
+            {"id": "beggar_den", "name": "丐帮总舵", "desc": "天下第一大帮，消息最灵通之处", "lat": 34.0600, "lng": 118.2500},
+            {"id": "river_dock", "name": "长江渡口", "desc": "南北水运枢纽，商贾云集", "lat": 30.5700, "lng": 117.1200},
         ],
         "agents": [
             {"id": "hero_yang", "name": "杨逸风", "identity": "江湖游侠", "personality": "豪爽侠义，武艺高强"},
@@ -398,14 +486,14 @@ TEMPLATE_WORLDS = {
         "name": "深夜事务所",
         "era": "现代都市",
         "locations": [
-            {"id": "office", "name": "事务所", "desc": "处理超自然委托的秘密基地"},
-            {"id": "cafe", "name": "午夜咖啡馆", "desc": "异界生物的中立聚会地"},
-            {"id": "hospital", "name": "市立医院", "desc": "频发灵异事件，太平间阴气重"},
-            {"id": "old_mansion", "name": "沈家老宅", "desc": "百年凶宅，怨气深重"},
-            {"id": "subway", "name": "地铁末班站", "desc": "连接阴阳两界的节点"},
-            {"id": "temple", "name": "城隍庙", "desc": "香火旺盛，阴司入口"},
-            {"id": "university", "name": "东江大学", "desc": "校园怪谈频发，地下有古墓"},
-            {"id": "night_market", "name": "鬼市", "desc": "深夜开启的妖怪集市，只对异类开放"},
+            {"id": "office", "name": "事务所", "desc": "处理超自然委托的秘密基地", "lat": 31.2304, "lng": 121.4737},
+            {"id": "cafe", "name": "午夜咖啡馆", "desc": "异界生物的中立聚会地", "lat": 31.2350, "lng": 121.4780},
+            {"id": "hospital", "name": "市立医院", "desc": "频发灵异事件，太平间阴气重", "lat": 31.2280, "lng": 121.4700},
+            {"id": "old_mansion", "name": "沈家老宅", "desc": "百年凶宅，怨气深重", "lat": 31.2400, "lng": 121.4800},
+            {"id": "subway", "name": "地铁末班站", "desc": "连接阴阳两界的节点", "lat": 31.2320, "lng": 121.4760},
+            {"id": "temple", "name": "城隍庙", "desc": "香火旺盛，阴司入口", "lat": 31.2250, "lng": 121.4680},
+            {"id": "university", "name": "东江大学", "desc": "校园怪谈频发，地下有古墓", "lat": 31.2450, "lng": 121.4850},
+            {"id": "night_market", "name": "鬼市", "desc": "深夜开启的妖怪集市，只对异类开放", "lat": 31.2380, "lng": 121.4650},
         ],
         "agents": [
             {"id": "boss_shen", "name": "沈夜", "identity": "事务所所长", "personality": "冷静理性，能力深不可测"},
@@ -455,6 +543,8 @@ async def _init_world_simulation(world_id: str, template_id: str, world_name: st
     ctx.eval_tracker = EvalTracker()
     ctx.dialogue_manager = DialogueManager()
     ctx.conflict_injector = ConflictInjector(world_id)
+    ctx.stagnation_detector = StagnationDetector(world_id)
+    ctx.disturbance_injector = DisturbanceInjector(world_id)
 
     # 世界状态
     template = TEMPLATE_WORLDS.get(template_id, TEMPLATE_WORLDS["cultivation"])
@@ -469,7 +559,9 @@ async def _init_world_simulation(world_id: str, template_id: str, world_name: st
         loc = Location(
             id=loc_data["id"],
             name=loc_data["name"],
-            description=loc_data["desc"]
+            description=loc_data["desc"],
+            lat=loc_data.get("lat", 0.0),
+            lng=loc_data.get("lng", 0.0),
         )
         ctx.world_state.add_location(loc)
 
@@ -836,6 +928,79 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
             # 回合预算结算
             ctx.budget_manager.finish_turn()
 
+            # ── D02/D03 停滞检测 + 自动注入 (每5回合) ──────
+            if turn % 5 == 0 and ctx.stagnation_detector and ctx.disturbance_injector:
+                try:
+                    # 获取最近事件用于检测
+                    recent_events_data = await ctx.event_store.query(limit=20)
+                    recent_events = [
+                        {
+                            "turn": e.turn,
+                            "action_type": e.action_type or "normal",
+                            "tags": [],
+                        }
+                        for e in recent_events_data
+                    ]
+
+                    # D02 停滞检测
+                    report = ctx.stagnation_detector.assess(
+                        recent_events=recent_events,
+                        current_turn=turn,
+                    )
+
+                    # D03 联动：停滞时自动注入扰动
+                    if report.is_stagnant:
+                        agents_info = {
+                            aid: {"name": a.config.name}
+                            for aid, a in ctx.agents.items()
+                        }
+                        locs_info = {
+                            lid: {"name": l.name}
+                            for lid, l in ctx.world_state.locations.items()
+                        }
+                        disturbances = ctx.disturbance_injector.auto_inject(
+                            stagnation_score=report.overall_stagnation_score,
+                            agents=agents_info,
+                            locations=locs_info,
+                            world_mood=ctx.world_state.world_mood,
+                            current_turn=turn,
+                        )
+                        if disturbances:
+                            # 将扰动画作事件写入 event_store
+                            for d in disturbances:
+                                await ctx.event_store.save(DBEvent(
+                                    timestamp=datetime.now().isoformat(),
+                                    turn=turn,
+                                    day=ctx.world_state.current_day,
+                                    time_of_day=ctx.world_state.time_of_day,
+                                    actor_id="__system__",
+                                    actor_name="【世界意志】",
+                                    target_name="",
+                                    action=d.description,
+                                    action_type="story_moment",
+                                    location=d.target_locations[0] if d.target_locations else "",
+                                    world_mood=ctx.world_state.world_mood,
+                                    status="completed",
+                                    elapsed_time=0.0,
+                                    score=0.8,
+                                    raw_response="",
+                                ))
+                            await ws_manager.broadcast(ctx.world_id, "DISTURBANCE", {
+                                "turn": turn,
+                                "disturbances": [d.to_dict() for d in disturbances],
+                                "stagnation_score": report.overall_stagnation_score,
+                            })
+
+                    # 停滞状态推送
+                    if report.is_stagnant:
+                        await ws_manager.broadcast(ctx.world_id, "STAGNATION_ALERT", {
+                            "turn": turn,
+                            "score": report.overall_stagnation_score,
+                            "alerts": [a.to_dict() for a in report.alerts],
+                        })
+                except Exception as e:
+                    print(f"[D02/D03] 检测异常: {e}")
+
             # 计算实时验收指标
             npc_alive = len(ctx.agents)
             interactions = int(_gauges["interactions"])
@@ -846,12 +1011,26 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
             go_status = npc_alive >= 10 and interactions >= 3 and story_moments >= 1
 
             # WebSocket: 每回合结束推送状态快照
+            # 构建NPC位置数据
+            npc_positions = []
+            for aid, agent in ctx.agents.items():
+                loc = ctx.world_state.get_location(agent.current_location or "")
+                npc_positions.append({
+                    "agent_id": aid,
+                    "agent_name": agent.config.name,
+                    "location_id": agent.current_location,
+                    "location_name": loc.name if loc else "未知",
+                    "lat": loc.lat if loc else 0.0,
+                    "lng": loc.lng if loc else 0.0,
+                })
+
             await ws_manager.broadcast(ctx.world_id, "TURN_COMPLETE", {
                 "turn": turn,
                 "day": ctx.world_state.current_day,
                 "time_of_day": ctx.world_state.time_of_day,
                 "world_mood": ctx.world_state.world_mood,
                 "agents": [a.to_dict() for a in ctx.agents.values()],
+                "npc_positions": npc_positions,
                 "event_count": total_acts,
                 "success_count": metrics.success_count,
                 "success_rate": success_rate,
@@ -864,6 +1043,25 @@ async def _run_simulation_loop(ctx: SimulationContext, total_turns: int = 100):
                 "graph_edges": ctx.knowledge_graph.get_edges_for_api(),
                 "budget": ctx.budget_manager.get_stats(),
                 "behavior": ctx.eval_tracker.get_summary() if ctx.eval_tracker else {},
+            })
+
+            # WebSocket: NPC位置专用事件（供WorldMap实时渲染）
+            npc_positions_full = []
+            for aid, agent in ctx.agents.items():
+                loc = ctx.world_state.get_location(agent.current_location or "")
+                npc_positions_full.append({
+                    "agent_id": aid,
+                    "agent_name": agent.config.name,
+                    "identity": agent.config.identity,
+                    "location_id": agent.current_location,
+                    "location_name": loc.name if loc else "未知",
+                    "lat": loc.lat if loc else 0.0,
+                    "lng": loc.lng if loc else 0.0,
+                    "is_alive": agent.is_alive,
+                })
+            await ws_manager.broadcast(ctx.world_id, "NPC_POSITION", {
+                "npcs": npc_positions_full,
+                "turn": turn,
             })
 
     finally:
@@ -896,6 +1094,7 @@ async def create_world(req: CreateWorldRequest):
         status="created"
     )
     worlds_db[world_id] = world.model_dump()
+    await db.save_world(world.model_dump())
 
     usage_tracker.start_session(world_id, req.name, req.template)
 
@@ -958,8 +1157,9 @@ async def delete_world(world_id: str):
         if os.path.exists(jsonl_path):
             os.remove(jsonl_path)
 
-    # 从数据库移除
+    # 从缓存和持久化存储移除
     worlds_db.pop(world_id, None)
+    await db.delete_world(world_id)
     usage_tracker.end_session(world_id)
 
     return {"status": "deleted", "world_id": world_id}
@@ -1297,6 +1497,291 @@ async def assess_and_inject_conflict(world_id: str):
         "conflict_injected": conflict is not None,
         "conflict": conflict.to_dict() if conflict else None,
         "stats": ctx.conflict_injector.get_conflict_stats()
+    }
+
+
+# ── D02 演化停滞检测 ──────────────────────────────────────────
+
+
+class StagnationCheckRequest(BaseModel):
+    window: int = Field(10, description="检测窗口（回合数）", ge=5, le=50)
+
+
+@app.get("/api/worlds/{world_id}/stagnation", tags=["世界管理"], summary="D02 停滞检测", description="检测世界模拟是否出现演化停滞，返回5项指标和综合停滞分。")
+async def get_stagnation(world_id: str):
+    """D02 检查当前世界的演化停滞状态"""
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.stagnation_detector:
+        raise HTTPException(status_code=404, detail="Stagnation detector not initialized")
+
+    if not ctx.event_store:
+        return {"stagnation": None, "message": "Event store not initialized"}
+
+    # 获取最近事件
+    recent_events_data = await ctx.event_store.query(limit=20)
+    recent_events = [
+        {
+            "turn": e.turn,
+            "action_type": e.action_type or "normal",
+            "tags": [],
+        }
+        for e in recent_events_data
+    ]
+
+    current_turn = ctx.world_state.current_turn if ctx.world_state else 0
+
+    # 执行检测
+    report = ctx.stagnation_detector.assess(recent_events, current_turn)
+
+    # 附加趋势数据
+    trends = {}
+    for metric in ["event_density", "relationship_change", "goal_achievement", "conflict_activity", "novelty_introduction"]:
+        trends[metric] = ctx.stagnation_detector.get_trend(metric)
+
+    return {
+        "stagnation": report.to_dict(),
+        "trends": trends,
+        "history": ctx.stagnation_detector.get_history(limit=10),
+        "alerts": ctx.stagnation_detector.get_alerts(),
+    }
+
+
+# ── D03 外部扰动投放 ──────────────────────────────────────────
+
+
+class DisturbanceInjectRequest(BaseModel):
+    count: int = Field(1, description="注入扰动数量", ge=1, le=5)
+    severity: Optional[float] = Field(None, description="强制严重度(0-1)，不指定则自动")
+
+
+class DisturbanceConfigRequest(BaseModel):
+    frequency: str = Field("medium", description="注入频率: none/low/medium/high")
+
+
+@app.post("/api/worlds/{world_id}/disturbance", tags=["世界管理"], summary="D03 注入外部扰动", description="手动注入外部扰动事件。可选参数：count(数量)、severity(严重度)。")
+async def inject_disturbance(world_id: str, req: DisturbanceInjectRequest):
+    """D03 手动注入外部扰动"""
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.disturbance_injector:
+        raise HTTPException(status_code=404, detail="Disturbance injector not initialized")
+
+    current_turn = ctx.world_state.current_turn if ctx.world_state else 0
+
+    # 选择模板
+    templates = ctx.disturbance_injector.select_templates(
+        world_mood=ctx.world_state.world_mood if ctx.world_state else "平静",
+        count=req.count,
+        current_turn=current_turn,
+    )
+
+    if not templates:
+        return {"disturbances": [], "message": "No suitable disturbance templates available"}
+
+    # 构建agent/location信息
+    agents_info = {
+        aid: {"name": a.config.name}
+        for aid, a in ctx.agents.items()
+    }
+    locs_info = {
+        lid: {"name": l.name}
+        for lid, l in ctx.world_state.locations.items()
+    } if ctx.world_state else {}
+
+    # 注入
+    events = ctx.disturbance_injector.inject(
+        templates=templates,
+        agents=agents_info,
+        locations=locs_info,
+        current_turn=current_turn,
+        force_severity=req.severity,
+    )
+
+    # 写入事件存储
+    if events and ctx.event_store:
+        from app.core.events.event_store import Event as DBEvent
+        for d in events:
+            await ctx.event_store.save(DBEvent(
+                timestamp=datetime.now().isoformat(),
+                turn=current_turn,
+                day=ctx.world_state.current_day if ctx.world_state else 0,
+                time_of_day=ctx.world_state.time_of_day if ctx.world_state else "",
+                actor_id="__system__",
+                actor_name="【世界意志】",
+                target_name="",
+                action=d.description,
+                action_type="story_moment",
+                location=d.target_locations[0] if d.target_locations else "",
+                world_mood=ctx.world_state.world_mood if ctx.world_state else "",
+                status="completed",
+                elapsed_time=0.0,
+                score=0.8,
+                raw_response="",
+            ))
+
+    return {
+        "disturbances": [d.to_dict() for d in events],
+        "count": len(events),
+        "stats": ctx.disturbance_injector.get_stats(),
+    }
+
+
+@app.get("/api/worlds/{world_id}/disturbance/config", tags=["世界管理"], summary="D03 获取扰动配置", description="获取当前扰动注入频率配置。")
+async def get_disturbance_config(world_id: str):
+    """获取扰动配置"""
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.disturbance_injector:
+        raise HTTPException(status_code=404, detail="Disturbance injector not initialized")
+    return {
+        "frequency": ctx.disturbance_injector.frequency.value,
+        "stats": ctx.disturbance_injector.get_stats(),
+        "history": ctx.disturbance_injector.get_history(limit=5),
+    }
+
+
+@app.post("/api/worlds/{world_id}/disturbance/config", tags=["世界管理"], summary="D03 配置扰动频率", description="配置外部扰动注入频率: none(关闭)/low(低)/medium(中)/high(高)。")
+async def set_disturbance_config(world_id: str, req: DisturbanceConfigRequest):
+    """配置扰动频率"""
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.disturbance_injector:
+        raise HTTPException(status_code=404, detail="Disturbance injector not initialized")
+
+    ctx.disturbance_injector.set_frequency(req.frequency)
+    return {
+        "frequency": req.frequency,
+        "message": f"扰动频率已设为: {req.frequency}",
+    }
+
+
+# ── F03 快照 API ──────────────────────────────────────────────
+
+
+class Snapshot(BaseModel):
+    id: str
+    world_id: str
+    turn: int
+    day: int
+    time_of_day: str
+    world_mood: str
+    event_summary: str
+    npc_positions: List[Dict]
+    created_at: str
+
+
+SNAPSHOT_DIR = DATA_DIR / "snapshots"
+
+
+@app.post("/api/worlds/{world_id}/snapshots", tags=["世界管理"], summary="F03 保存世界快照", description="保存当前世界状态快照，包含时间点/事件摘要/NPC位置/世界氛围。")
+async def save_snapshot(world_id: str):
+    """保存世界状态快照"""
+    ctx = simulations.get(world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    if not ctx.world_state:
+        return {"snapshot": None, "message": "World state not initialized"}
+
+    SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 获取最近事件摘要
+    events_text = ""
+    if ctx.event_store:
+        recent = await ctx.event_store.query(limit=10)
+        events_text = "; ".join([f"回合{e.turn}: {e.actor_name} {e.action[:50]}" for e in recent])
+
+    # NPC位置
+    npc_positions = []
+    for aid, agent in ctx.agents.items():
+        loc = ctx.world_state.get_location(agent.current_location or "")
+        npc_positions.append({
+            "agent_id": aid,
+            "agent_name": agent.config.name,
+            "location_id": agent.current_location,
+            "location_name": loc.name if loc else "未知",
+            "lat": loc.lat if loc else 0.0,
+            "lng": loc.lng if loc else 0.0,
+        })
+
+    snapshot = Snapshot(
+        id=str(uuid.uuid4())[:8],
+        world_id=world_id,
+        turn=ctx.world_state.current_turn,
+        day=ctx.world_state.current_day,
+        time_of_day=ctx.world_state.time_of_day,
+        world_mood=ctx.world_state.world_mood,
+        event_summary=events_text[:500],
+        npc_positions=npc_positions,
+        created_at=datetime.now().isoformat(),
+    )
+
+    # 持久化到JSON文件
+    snap_file = SNAPSHOT_DIR / f"{world_id}.json"
+    existing = []
+    if snap_file.exists():
+        existing = json.loads(snap_file.read_text(encoding="utf-8"))
+    existing.append(snapshot.model_dump())
+    # 保留最近50个快照
+    existing = existing[-50:]
+    snap_file.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    return {"snapshot": snapshot.model_dump()}
+
+
+@app.get("/api/worlds/{world_id}/snapshots", tags=["世界管理"], summary="F03 获取快照列表", description="返回世界所有已保存的快照列表。")
+async def list_snapshots(world_id: str, limit: int = 20):
+    """获取快照列表"""
+    SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    snap_file = SNAPSHOT_DIR / f"{world_id}.json"
+
+    if not snap_file.exists():
+        return {"snapshots": [], "total": 0}
+
+    existing = json.loads(snap_file.read_text(encoding="utf-8"))
+    return {"snapshots": existing[-limit:], "total": len(existing)}
+
+
+@app.get("/api/worlds/{world_id}/snapshots/{snapshot_id}", tags=["世界管理"], summary="F03 获取快照详情", description="获取单个快照的完整数据。")
+async def get_snapshot(world_id: str, snapshot_id: str):
+    """获取单个快照"""
+    SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    snap_file = SNAPSHOT_DIR / f"{world_id}.json"
+
+    if not snap_file.exists():
+        raise HTTPException(status_code=404, detail="No snapshots found")
+
+    existing = json.loads(snap_file.read_text(encoding="utf-8"))
+    for snap in existing:
+        if snap["id"] == snapshot_id:
+            return {"snapshot": snap}
+    raise HTTPException(status_code=404, detail="Snapshot not found")
+
+
+# ── F02 NPC位置 API ────────────────────────────────────────────
+
+
+@app.get("/api/worlds/{world_id}/npc-locations", tags=["世界管理"], summary="F02 获取NPC位置", description="返回世界上所有NPC的当前位置坐标，用于地图渲染。")
+async def get_npc_locations(world_id: str):
+    """获取所有NPC位置（含坐标）"""
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.world_state:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    npc_locs = []
+    for aid, agent in ctx.agents.items():
+        loc = ctx.world_state.get_location(agent.current_location or "")
+        npc_locs.append({
+            "agent_id": aid,
+            "agent_name": agent.config.name,
+            "identity": agent.config.identity,
+            "location_id": agent.current_location,
+            "location_name": loc.name if loc else "未知",
+            "lat": loc.lat if loc else 0.0,
+            "lng": loc.lng if loc else 0.0,
+            "is_alive": agent.is_alive,
+        })
+
+    return {
+        "npcs": npc_locs,
+        "total": len(npc_locs),
     }
 
 
@@ -1667,6 +2152,7 @@ async def start_simulation(world_id: str):
         raise HTTPException(status_code=400, detail="World simulation context not initialized")
 
     worlds_db[world_id]["status"] = "running"
+    await db.update_world_status(world_id, "running")
 
     # 后台启动模拟
     ctx._sim_task = asyncio.create_task(_run_simulation_loop(ctx, total_turns=100))
@@ -1706,6 +2192,7 @@ async def simulate_stop(req: dict):
         usage_tracker.end_session(world_id)
         if world_id in worlds_db:
             worlds_db[world_id]["status"] = "stopped"
+            await db.update_world_status(world_id, "stopped")
 
     return {"status": "stopped", "world_id": world_id}
 
@@ -1723,6 +2210,7 @@ async def simulate_pause(req: dict):
 
     if world_id in worlds_db:
         worlds_db[world_id]["status"] = "paused"
+        await db.update_world_status(world_id, "paused")
 
     return {"status": "paused", "world_id": world_id}
 
@@ -1740,6 +2228,7 @@ async def simulate_resume(req: dict):
 
     if world_id in worlds_db:
         worlds_db[world_id]["status"] = "running"
+        await db.update_world_status(world_id, "running")
 
     return {"status": "resumed", "world_id": world_id}
 
@@ -1760,6 +2249,7 @@ async def simulate_step(req: dict):
     # 如果模拟未运行，先启动
     if not ctx.is_running:
         worlds_db[world_id]["status"] = "running"
+        await db.update_world_status(world_id, "running")
         ctx._running = True
 
     # 执行指定回合数
@@ -1839,6 +2329,7 @@ async def reset_world(world_id: str):
 
     # 重置状态
     worlds_db[world_id]["status"] = "created"
+    await db.update_world_status(world_id, "created")
 
     return {"status": "reset", "world_id": world_id}
 
