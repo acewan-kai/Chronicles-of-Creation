@@ -26,6 +26,7 @@ from app.core.events.query_engine import QueryEngine
 from app.core.knowledge.lorebook import Lorebook, LoreEntry
 from app.core.knowledge.knowledge_graph import KnowledgeGraph, KnowledgeNode, KnowledgeRelation, NodeType, RelationType
 from app.core.knowledge.budget_manager import BudgetManager
+from app.core.knowledge.consistency_checker import ConsistencyChecker, ConsistencyReport
 from app.core.agent.agent import Agent, AgentConfig, MemoryStream
 from app.core.agent.planner import Planner
 from app.core.agent.reflector import Reflector
@@ -35,6 +36,7 @@ from app.core.scoring.scorer import AestheticScorer
 from app.core.scoring.behavior_evaluator import BehaviorEvaluator, EvalTracker
 from app.core.sandbox.narrative_extractor import NarrativeExtractor
 from app.core.sandbox.story_sifter import StorySifter
+from app.core.sandbox.conflict_injector import ConflictInjector, ConflictType
 from app.core.sandbox.multi_llm_client import LLMClientFactory, MultiLLMClient, LLMProvider
 from app.core.usage_tracker import UsageTracker
 from app.core.onboarding import OnboardingGuide
@@ -131,6 +133,7 @@ class SimulationContext:
         self.eval_tracker: Optional[EvalTracker] = None
         self.behavior_evaluator: Optional[BehaviorEvaluator] = None
         self.dialogue_manager: Optional[DialogueManager] = None
+        self.conflict_injector: Optional[ConflictInjector] = None
         self._sim_task: Optional[asyncio.Task] = None
         self._running: bool = False
 
@@ -451,6 +454,7 @@ async def _init_world_simulation(world_id: str, template_id: str, world_name: st
     ctx.behavior_evaluator = BehaviorEvaluator()
     ctx.eval_tracker = EvalTracker()
     ctx.dialogue_manager = DialogueManager()
+    ctx.conflict_injector = ConflictInjector(world_id)
 
     # 世界状态
     template = TEMPLATE_WORLDS.get(template_id, TEMPLATE_WORLDS["cultivation"])
@@ -1112,6 +1116,187 @@ async def get_world_relationships(world_id: str):
             "total": len(edges),
             "by_type": rel_types
         }
+    }
+
+
+class ConsistencyCheckRequest(BaseModel):
+    min_turn: Optional[int] = Field(1, description="起始回合")
+    max_turn: Optional[int] = Field(None, description="结束回合")
+    check_recent_only: bool = Field(False, description="仅检查最近事件")
+
+
+@app.post("/api/worlds/{world_id}/consistency", tags=["世界管理"], summary="设定一致性检测", description="B02 设定一致性实时检测。检测因果矛盾/属性冲突/时序矛盾等，单次检测≤2秒。")
+async def check_consistency(world_id: str, req: ConsistencyCheckRequest):
+    """
+    B02 设定一致性检测API
+
+    检测类型：
+    - 因果矛盾：角色死亡后仍执行动作等
+    - 属性冲突：性格、身份前后不一致
+    - 时序矛盾：事件时间顺序冲突
+    - 关系矛盾：角色互动与已知关系矛盾
+    - 知识矛盾：与世界设定冲突
+    """
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.event_store:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    # 获取当前回合
+    current_turn = ctx.world_state.current_turn if ctx.world_state else 0
+
+    # 获取要检测的事件
+    if req.check_recent_only:
+        # 只检测最近的事件
+        events = await ctx.event_store.query(limit=20)
+    elif req.max_turn:
+        events = await ctx.event_store.query(
+            turn_range=(req.min_turn or 1, req.max_turn),
+            limit=100
+        )
+    else:
+        events = await ctx.event_store.query(limit=100)
+
+    if not events:
+        return {
+            "report": None,
+            "message": "No events found for consistency check"
+        }
+
+    # 构建角色属性字典
+    agents_attrs = {}
+    for agent_id, agent in ctx.agents.items():
+        agents_attrs[agent_id] = {
+            "name": agent.name,
+            "identity": agent.config.identity if agent.config else "",
+            "personality": agent.config.personality if agent.config else "",
+            "is_alive": agent.is_alive,
+            "current_location": agent.current_location
+        }
+
+    # 执行一致性检测
+    checker = ConsistencyChecker(world_id)
+
+    # 预先记录已知的死亡信息
+    for agent_id, attrs in agents_attrs.items():
+        if not attrs.get("is_alive", True):
+            checker.record_death(agent_id, current_turn)
+
+    # 执行检测
+    events_data = [
+        {
+            "actor": e.get("actor", ""),
+            "event": e.get("description", str(e)),
+            "action": e.get("action", e.get("description", "")),
+            "turn": e.get("turn", 0),
+            "type": e.get("type", "normal")
+        }
+        for e in events
+    ]
+
+    report = checker.check_consistency(events_data, agents_attrs, current_turn)
+
+    return {"report": report.to_dict()}
+
+
+@app.get("/api/worlds/{world_id}/consistency/quick", tags=["世界管理"], summary="快速一致性检查", description="对单个事件或文本进行快速一致性检查。")
+async def quick_consistency_check(world_id: str, text: str, agent_id: str):
+    """对单个事件进行快速一致性检测"""
+    ctx = simulations.get(world_id)
+    if not ctx:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    current_turn = ctx.world_state.current_turn if ctx.world_state else 0
+
+    checker = ConsistencyChecker(world_id)
+
+    # 预先记录死亡信息
+    for aid, agent in ctx.agents.items():
+        if not agent.is_alive:
+            checker.record_death(aid, current_turn)
+
+    contradiction = checker.quick_check(text, agent_id, current_turn)
+
+    if contradiction:
+        return {
+            "has_contradiction": True,
+            "contradiction": {
+                "type": contradiction.contradiction_type.value,
+                "severity": contradiction.severity,
+                "description": contradiction.description,
+                "evidence": contradiction.evidence,
+                "suggested_fix": contradiction.suggested_fix
+            }
+        }
+
+    return {"has_contradiction": False, "contradiction": None}
+
+
+@app.get("/api/worlds/{world_id}/conflicts", tags=["世界管理"], summary="获取冲突状态", description="D01 获取当前世界的冲突注入状态和活跃冲突列表。")
+async def get_conflict_status(world_id: str):
+    """获取冲突状态"""
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.conflict_injector:
+        return {"conflicts": None, "message": "Conflict injector not initialized"}
+
+    return ctx.conflict_injector.to_dict()
+
+
+@app.post("/api/worlds/{world_id}/conflicts/assess", tags=["世界管理"], summary="评估热度并注入冲突", description="D01 评估当前世界热度，在必要时注入冲突事件。")
+async def assess_and_inject_conflict(world_id: str):
+    """
+    D01 冲突注入引擎API
+
+    评估当前世界热度指标，并在热度下降时自动注入冲突事件
+    """
+    ctx = simulations.get(world_id)
+    if not ctx or not ctx.conflict_injector:
+        raise HTTPException(status_code=404, detail="Conflict injector not initialized")
+
+    if not ctx.event_store:
+        raise HTTPException(status_code=404, detail="Event store not initialized")
+
+    # 获取最近事件
+    recent_events = await ctx.event_store.query(limit=50)
+
+    # 统计关系变化
+    relationship_changes = 0
+    for event in recent_events:
+        if event.get("type") == "interaction":
+            relationship_changes += 1
+
+    # 获取当前回合
+    current_turn = ctx.world_state.current_turn if ctx.world_state else 0
+
+    # 评估热度
+    heat = ctx.conflict_injector.assess_heat(
+        recent_events=[{
+            "turn": e.get("turn", 0),
+            "action_type": e.get("type", "normal"),
+            "tags": []
+        } for e in recent_events],
+        relationship_changes=relationship_changes,
+        total_interactions=len(recent_events),
+        current_turn=current_turn
+    )
+
+    # 生成冲突
+    agents_dict = {
+        aid: {"name": agent.name for aid, agent in ctx.agents.items()}
+    }
+    conflict = ctx.conflict_injector.generate_conflict(agents_dict, heat, current_turn)
+
+    return {
+        "heat": {
+            "event_density": heat.event_density,
+            "relationship_change_rate": heat.relationship_change_rate,
+            "goal_achievement_rate": heat.goal_achievement_rate,
+            "conflict_resolution_rate": heat.conflict_resolution_rate,
+            "new_event_introduction_rate": heat.new_event_introduction_rate,
+            "overall_heat": heat.overall_heat
+        },
+        "conflict_injected": conflict is not None,
+        "conflict": conflict.to_dict() if conflict else None,
+        "stats": ctx.conflict_injector.get_conflict_stats()
     }
 
 
