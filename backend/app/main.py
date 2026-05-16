@@ -2530,86 +2530,6 @@ async def simulate_status(world_id: str = ""):
 
 
 # ═══════════════════════════════════════════════════════════
-# 无 /api 前缀路由别名 (前端生产环境直连调用)
-# ═══════════════════════════════════════════════════════════
-
-@app.get("/info", tags=["基础"], summary="[别名] API信息", description="无/api前缀别名，生产环境使用。")
-async def info_alias():
-    return await api_info()
-
-
-@app.get("/templates", tags=["模板"], summary="[别名] 模板列表", description="无/api前缀别名，生产环境使用。")
-async def templates_alias():
-    return await list_templates()
-
-
-@app.get("/books", tags=["小说管理"], summary="[别名] 小说列表", description="无/api前缀别名，生产环境使用。")
-async def books_list_alias():
-    return await list_books()
-
-
-@app.post("/books", tags=["小说管理"], summary="[别名] 创建小说", description="无/api前缀别名，生产环境使用。")
-async def books_create_alias(req: CreateBookRequest):
-    return await create_book(req)
-
-
-@app.get("/books/{book_id}", tags=["小说管理"], summary="[别名] 小说详情", description="无/api前缀别名，生产环境使用。")
-async def books_get_alias(book_id: str):
-    return await get_book(book_id)
-
-
-@app.get("/worlds", tags=["世界管理"], summary="[别名] 世界列表", description="无/api前缀别名，生产环境使用。")
-async def worlds_list_alias():
-    return await list_worlds()
-
-
-@app.post("/worlds", tags=["世界管理"], summary="[别名] 创建世界", description="无/api前缀别名，生产环境使用。")
-async def worlds_create_alias(req: CreateWorldRequest):
-    return await create_world(req)
-
-
-@app.get("/worlds/{world_id}", tags=["世界管理"], summary="[别名] 世界详情", description="无/api前缀别名，生产环境使用。")
-async def worlds_get_alias(world_id: str):
-    return await get_world(world_id)
-
-
-@app.get("/worlds/{world_id}/events", tags=["世界管理"], summary="[别名] 查询事件", description="无/api前缀别名，生产环境使用。")
-async def worlds_events_alias(
-    world_id: str,
-    limit: int = 100,
-    by_turn: Optional[int] = None,
-    by_actor: Optional[str] = None,
-    by_type: Optional[str] = None,
-    by_location: Optional[str] = None,
-    min_turn: Optional[int] = None,
-    max_turn: Optional[int] = None,
-):
-    return await get_world_events(
-        world_id, limit, by_turn, by_actor, by_type, by_location, min_turn, max_turn
-    )
-
-
-@app.get("/worlds/{world_id}/metrics", tags=["世界管理"], summary="[别名] 运行指标", description="无/api前缀别名，生产环境使用。")
-async def worlds_metrics_alias(world_id: str):
-    return await get_world_metrics(world_id)
-
-
-@app.post("/simulate/start", tags=["模拟控制"], summary="[别名] 启动模拟", description="无/api前缀别名，生产环境使用。")
-async def simulate_start_alias(req: dict):
-    return await simulate_start(req)
-
-
-@app.post("/simulate/stop", tags=["模拟控制"], summary="[别名] 停止模拟", description="无/api前缀别名，生产环境使用。")
-async def simulate_stop_alias(req: dict):
-    return await simulate_stop(req)
-
-
-@app.get("/simulate/status", tags=["模拟控制"], summary="[别名] 模拟状态", description="无/api前缀别名，生产环境使用。")
-async def simulate_status_alias(world_id: str = ""):
-    return await simulate_status(world_id)
-
-
-# ═══════════════════════════════════════════════════════════
 # G04 风格化生成 API
 # ═══════════════════════════════════════════════════════════
 
@@ -2927,7 +2847,7 @@ async def generate_descend_options(world_id: str, agent_id: str, req: DescendOpt
     if ctx.descend_manager.current_agent_id != agent_id:
         raise HTTPException(status_code=409, detail="Descend agent mismatch")
 
-    llm = getattr(ctx, 'llm_client', None)
+    llm = ctx.executor.llm_client if ctx.executor else None
     options = await ctx.descend_manager.generate_options(
         situation=req.situation,
         llm_client=llm,
@@ -2945,6 +2865,167 @@ async def get_descend_logs(world_id: str, limit: int = 10):
 
     logs = ctx.descend_manager.get_logs(limit=limit)
     return {"world_id": world_id, "logs": logs, "total": len(logs)}
+
+
+# ═══════════════════════════════════════════════════════════
+# 无 /api 前缀路由别名 (前端生产环境直连调用)
+# 所有别名必须在文件末尾，确保引用的函数和模型已定义
+# ═══════════════════════════════════════════════════════════
+
+@app.get("/info", tags=["基础"], summary="[别名] API信息", description="无/api前缀别名，生产环境使用。")
+async def info_alias():
+    return await api_info()
+
+
+@app.get("/templates", tags=["模板"], summary="[别名] 模板列表", description="无/api前缀别名，生产环境使用。")
+async def templates_alias():
+    return await list_templates()
+
+
+@app.get("/books", tags=["小说管理"], summary="[别名] 小说列表", description="无/api前缀别名，生产环境使用。")
+async def books_list_alias():
+    return await list_books()
+
+
+@app.post("/books", tags=["小说管理"], summary="[别名] 创建小说", description="无/api前缀别名，生产环境使用。")
+async def books_create_alias(req: CreateBookRequest):
+    return await create_book(req)
+
+
+@app.get("/books/{book_id}", tags=["小说管理"], summary="[别名] 小说详情", description="无/api前缀别名，生产环境使用。")
+async def books_get_alias(book_id: str):
+    return await get_book(book_id)
+
+
+@app.get("/worlds", tags=["世界管理"], summary="[别名] 世界列表", description="无/api前缀别名，生产环境使用。")
+async def worlds_list_alias():
+    return await list_worlds()
+
+
+@app.post("/worlds", tags=["世界管理"], summary="[别名] 创建世界", description="无/api前缀别名，生产环境使用。")
+async def worlds_create_alias(req: CreateWorldRequest):
+    return await create_world(req)
+
+
+@app.post("/worlds/generate", tags=["世界管理"], summary="[别名] 智能生成世界", description="无/api前缀别名，生产环境使用。")
+async def worlds_generate_alias(req: WorldGenerateRequest):
+    return await generate_world(req)
+
+
+@app.get("/worlds/{world_id}", tags=["世界管理"], summary="[别名] 世界详情", description="无/api前缀别名，生产环境使用。")
+async def worlds_get_alias(world_id: str):
+    return await get_world(world_id)
+
+
+@app.get("/worlds/{world_id}/events", tags=["世界管理"], summary="[别名] 查询事件", description="无/api前缀别名，生产环境使用。")
+async def worlds_events_alias(
+    world_id: str,
+    limit: int = 100,
+    by_turn: Optional[int] = None,
+    by_actor: Optional[str] = None,
+    by_type: Optional[str] = None,
+    by_location: Optional[str] = None,
+    min_turn: Optional[int] = None,
+    max_turn: Optional[int] = None,
+):
+    return await get_world_events(
+        world_id, limit, by_turn, by_actor, by_type, by_location, min_turn, max_turn
+    )
+
+
+@app.get("/worlds/{world_id}/metrics", tags=["世界管理"], summary="[别名] 运行指标", description="无/api前缀别名，生产环境使用。")
+async def worlds_metrics_alias(world_id: str):
+    return await get_world_metrics(world_id)
+
+
+@app.post("/simulate/start", tags=["模拟控制"], summary="[别名] 启动模拟", description="无/api前缀别名，生产环境使用。")
+async def simulate_start_alias(req: dict):
+    return await simulate_start(req)
+
+
+@app.post("/simulate/stop", tags=["模拟控制"], summary="[别名] 停止模拟", description="无/api前缀别名，生产环境使用。")
+async def simulate_stop_alias(req: dict):
+    return await simulate_stop(req)
+
+
+@app.get("/simulate/status", tags=["模拟控制"], summary="[别名] 模拟状态", description="无/api前缀别名，生产环境使用。")
+async def simulate_status_alias(world_id: str = ""):
+    return await simulate_status(world_id)
+
+
+# ── F02 NPC位置别名 ──
+
+@app.get("/worlds/{world_id}/npc-locations", tags=["世界管理"], summary="[别名] F02 NPC位置", description="无/api前缀别名，生产环境使用。")
+async def npc_locations_alias(world_id: str):
+    return await get_npc_locations(world_id)
+
+
+# ── F03 快照别名 ──
+
+@app.post("/worlds/{world_id}/snapshots", tags=["世界管理"], summary="[别名] F03 保存快照", description="无/api前缀别名，生产环境使用。")
+async def save_snapshot_alias(world_id: str):
+    return await save_snapshot(world_id)
+
+
+@app.get("/worlds/{world_id}/snapshots", tags=["世界管理"], summary="[别名] F03 快照列表", description="无/api前缀别名，生产环境使用。")
+async def list_snapshots_alias(world_id: str, limit: int = 20):
+    return await list_snapshots(world_id, limit)
+
+
+@app.get("/worlds/{world_id}/snapshots/{snapshot_id}", tags=["世界管理"], summary="[别名] F03 快照详情", description="无/api前缀别名，生产环境使用。")
+async def get_snapshot_alias(world_id: str, snapshot_id: str):
+    return await get_snapshot(world_id, snapshot_id)
+
+
+# ── G04 风格化别名 ──
+
+@app.get("/style/presets", tags=["品味学习"], summary="[别名] G04 风格预设", description="无/api前缀别名，生产环境使用。")
+async def style_presets_alias():
+    return await get_style_presets()
+
+
+@app.post("/style/generate", tags=["品味学习"], summary="[别名] G04 风格生成", description="无/api前缀别名，生产环境使用。")
+async def style_generate_alias(req: StyleGenerateRequest):
+    return await generate_styled_chapter(req)
+
+
+# ── C02 一致性守护别名 ──
+
+@app.get("/worlds/{world_id}/consistency/guardian", tags=["世界管理"], summary="[别名] C02 一致性守护", description="无/api前缀别名，生产环境使用。")
+async def consistency_guardian_alias(world_id: str):
+    return await get_consistency_guardian(world_id)
+
+
+# ── F04 降临模式别名 ──
+
+@app.post("/worlds/{world_id}/agents/{agent_id}/descend", tags=["世界管理"], summary="[别名] F04 降临", description="无/api前缀别名，生产环境使用。")
+async def descend_alias(world_id: str, agent_id: str):
+    return await descend_to_agent(world_id, agent_id)
+
+
+@app.delete("/worlds/{world_id}/agents/{agent_id}/descend", tags=["世界管理"], summary="[别名] F04 退出降临", description="无/api前缀别名，生产环境使用。")
+async def exit_descend_alias(world_id: str, agent_id: str):
+    return await exit_descend(world_id, agent_id)
+
+
+@app.post("/worlds/{world_id}/agents/{agent_id}/descend/act", tags=["世界管理"], summary="[别名] F04 降临行动", description="无/api前缀别名，生产环境使用。")
+async def descend_act_alias(world_id: str, agent_id: str, req: DescendActRequest):
+    return await descend_act(world_id, agent_id, req)
+
+
+@app.get("/worlds/{world_id}/agents/{agent_id}/descend/status", tags=["世界管理"], summary="[别名] F04 降临状态", description="无/api前缀别名，生产环境使用。")
+async def descend_status_alias(world_id: str, agent_id: str):
+    return await get_descend_status(world_id, agent_id)
+
+
+@app.post("/worlds/{world_id}/agents/{agent_id}/descend/options", tags=["世界管理"], summary="[别名] F04 降临选项", description="无/api前缀别名，生产环境使用。")
+async def descend_options_alias(world_id: str, agent_id: str, req: DescendOptionsRequest):
+    return await generate_descend_options(world_id, agent_id, req)
+
+
+@app.get("/worlds/{world_id}/descend/logs", tags=["世界管理"], summary="[别名] F04 降临日志", description="无/api前缀别名，生产环境使用。")
+async def descend_logs_alias(world_id: str, limit: int = 10):
+    return await get_descend_logs(world_id, limit)
 
 
 if __name__ == "__main__":

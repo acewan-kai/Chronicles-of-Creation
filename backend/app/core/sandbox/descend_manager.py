@@ -341,13 +341,13 @@ class DescendManager:
 
 直接输出选项（每行一个）："""
 
-        completion = await llm_client.chat.completions.create(
-            model="auto",
+        content = await llm_client.generate(
             messages=[{"role": "user", "content": prompt}],
             temperature=0.8,
             max_tokens=300,
         )
-        content = completion.choices[0].message.content or ""
+        if not content:
+            return []
 
         # 解析选项
         options = []

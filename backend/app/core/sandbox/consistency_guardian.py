@@ -425,13 +425,12 @@ class ConsistencyGuardian:
 
 请生成1-2句简短的修正建议，帮助角色回归一致的行为模式。直接输出建议："""
         try:
-            completion = await llm_client.chat.completions.create(
-                model="auto",
+            content = await llm_client.generate(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.5,
                 max_tokens=150,
             )
-            return completion.choices[0].message.content or deviation.suggested_correction
+            return content or deviation.suggested_correction
         except Exception:
             return deviation.suggested_correction
 
