@@ -2521,10 +2521,11 @@ async def simulate_status(world_id: str = ""):
     """获取模拟状态"""
     if world_id and world_id in simulations:
         ctx = simulations[world_id]
+        metrics = await ctx.event_store.get_metrics() if ctx.event_store else {}
         return {
             "is_running": ctx.is_running,
             "turn": ctx.world_state.current_turn if ctx.world_state else 0,
-            "event_count": 0  # 简化
+            "event_count": metrics.get("total_events", 0),
         }
     return {"is_running": False, "turn": 0, "event_count": 0}
 
@@ -2871,6 +2872,23 @@ async def get_descend_logs(world_id: str, limit: int = 10):
 # 无 /api 前缀路由别名 (前端生产环境直连调用)
 # 所有别名必须在文件末尾，确保引用的函数和模型已定义
 # ═══════════════════════════════════════════════════════════
+
+# ── 用户认证别名 ──
+
+@app.post("/auth/register", tags=["用户认证"], summary="[别名] 用户注册", description="无/api前缀别名，生产环境使用。")
+async def register_alias(req: RegisterRequest):
+    return await register(req)
+
+
+@app.post("/auth/login", tags=["用户认证"], summary="[别名] 用户登录", description="无/api前缀别名，生产环境使用。")
+async def login_alias(req: LoginRequest):
+    return await login(req)
+
+
+@app.get("/auth/me", tags=["用户认证"], summary="[别名] 当前用户", description="无/api前缀别名，生产环境使用。")
+async def me_alias(user_id: str = Depends(require_user_id)):
+    return await get_me(user_id)
+
 
 @app.get("/info", tags=["基础"], summary="[别名] API信息", description="无/api前缀别名，生产环境使用。")
 async def info_alias():
